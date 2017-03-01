@@ -17,22 +17,29 @@ import (
 )
 
 func main() {
+
     // use New() instead of o := map[string]interface{}{}
     o := orderedmap.New()
+
     // use Set instead of o["a"] = 1
     o.Set("a", 1)
+
     // use Get instead of i, ok := o["a"]
     val, ok := o.Get("a")
+
     // use Keys instead of for k, v := range o
     key := o.Keys()
     for _, k := range keys {
         v, _ := o.Get(k)
     }
+
     // use o.Delete instead of delete(o, key)
     err := o.Delete("a")
+
     // serialize to a json string using encoding/json
     bytes, err := json.Marshal(o)
     prettyBytes, err := json.MarshalIndent(o)
+
     // deserialize a json string using encoding/json
     // all maps (including nested maps) will be parsed as orderedmaps
     s := `{"a": 1}`
