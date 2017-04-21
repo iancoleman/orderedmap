@@ -10,16 +10,17 @@ import (
 var NoValueError = errors.New("No value for this key")
 
 type KeyIndex struct {
-	Key string
+	Key   string
 	Index int
 }
 type ByIndex []KeyIndex
+
 func (a ByIndex) Len() int           { return len(a) }
 func (a ByIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByIndex) Less(i, j int) bool { return a[i].Index < a[j].Index }
 
 type OrderedMap struct {
-	keys []string
+	keys   []string
 	values map[string]interface{}
 }
 
@@ -92,13 +93,13 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 			closeBraces = closeBraces + strings.Count(section, "}")
 			depth = depth + openBraces - closeBraces
 			if depth <= 1 {
-				ki := KeyIndex {
-					Key: k,
+				ki := KeyIndex{
+					Key:   k,
 					Index: i,
 				}
 				orderedKeys = append(orderedKeys, ki)
 				// check if value is nested map
-				if j < len(sections) - 1 {
+				if j < len(sections)-1 {
 					nextSectionUnclean := sections[j+1]
 					nextSection := strings.TrimSpace(nextSectionUnclean)
 					if string(nextSection[0]) == "{" {
