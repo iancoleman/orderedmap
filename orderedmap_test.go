@@ -80,6 +80,32 @@ func TestOrderedMap(t *testing.T) {
 	}
 }
 
+func TestBlankMarshalJSON(t *testing.T) {
+	o := New()
+	// blank map
+	b, err := json.Marshal(o)
+	if err != nil {
+		t.Error("Marshalling blank map to json", err)
+	}
+	s := string(b)
+	// check json is correctly ordered
+	if s != `{}` {
+		t.Error("JSON Marshaling blank map value is incorrect", s)
+	}
+	// convert to indented json
+	bi, err := json.MarshalIndent(o, "", "  ")
+	if err != nil {
+		t.Error("Marshalling indented json for blank map", err)
+	}
+	si := string(bi)
+	ei := `{}`
+	if si != ei {
+		fmt.Println(ei)
+		fmt.Println(si)
+		t.Error("JSON MarshalIndent blank map value is incorrect", si)
+	}
+}
+
 func TestMarshalJSON(t *testing.T) {
 	o := New()
 	// number

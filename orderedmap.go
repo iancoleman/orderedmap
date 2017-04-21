@@ -141,7 +141,9 @@ func (o OrderedMap) MarshalJSON() ([]byte, error) {
 		}
 		s = s + string(vBytes) + ","
 	}
-	s = s[0:len(s)-1]
+	if len(o.keys) > 0 {
+		s = s[0 : len(s)-1]
+	}
 	s = s + "}"
 	return []byte(s), nil
 }
