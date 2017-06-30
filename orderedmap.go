@@ -93,7 +93,7 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 			sTrimmed = sTrimmed[0:lastIndex]
 			sTrimmed = strings.TrimSpace(sTrimmed)
 			if len(sTrimmed) > 0 && sTrimmed[len(sTrimmed)-1] == ',' {
-				sTrimmed = sTrimmed[0:len(sTrimmed)-1]
+				sTrimmed = sTrimmed[0 : len(sTrimmed)-1]
 			}
 			maybeValidJson := sTrimmed + "}"
 			testMap := map[string]interface{}{}
@@ -101,13 +101,13 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 			if err == nil {
 				// record the position of this key in s
 				ki := KeyIndex{
-					Key: k,
+					Key:   k,
 					Index: len(sTrimmed),
 				}
 				orderedKeys = append(orderedKeys, ki)
 				// if the value for this key is a map, convert it to an orderedmap
 				startOfValueIndex := lastIndex + len(kQuoted)
-				valueStr := s[startOfValueIndex:len(s)-1]
+				valueStr := s[startOfValueIndex : len(s)-1]
 				valueStr = strings.TrimSpace(valueStr)
 				if len(valueStr) > 0 && valueStr[0] == ':' {
 					valueStr = valueStr[1:len(valueStr)]
@@ -116,17 +116,22 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 				if valueStr[0] == '{' {
 					// find end of valueStr by removing everything after last }
 					// until it forms valid json
-					hasValidJson := true
-					subTestMap := map[string]interface{}{}
-					err = json.Unmarshal([]byte(valueStr), &subTestMap)
-					for len(valueStr) > 0 && err != nil {
-						lastCloseBrace := strings.LastIndex(valueStr, "}")
-						if lastCloseBrace == -1 {
-							hasValidJson = false
+					hasValidJson := false
+					i := 1
+					for i < len(valueStr) && !hasValidJson {
+						if valueStr[i] != '}' {
+							i = i + 1
+							continue
+						}
+						subTestMap := map[string]interface{}{}
+						testValue := valueStr[0 : i+1]
+						err = json.Unmarshal([]byte(testValue), &subTestMap)
+						if err == nil {
+							hasValidJson = true
+							valueStr = testValue
 							break
 						}
-						valueStr = valueStr[0:lastCloseBrace+1]
-						err = json.Unmarshal([]byte(valueStr), &subTestMap)
+						i = i + 1
 					}
 					// convert to orderedmap
 					if hasValidJson {
