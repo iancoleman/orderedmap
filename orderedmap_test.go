@@ -249,3 +249,12 @@ func TestUnmarshalJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestUnmarshalJSONSpecialChars(t *testing.T) {
+	s := `{ " \\\\\\\\\\\\ "  : { "\\\\\\" : "\\\\\"\\" }, "\\":  " \\\\ test " }`
+	o := New()
+	err := json.Unmarshal([]byte(s), &o)
+	if err != nil {
+		t.Error("JSON Unmarshal error with special chars", err)
+	}
+}
