@@ -174,7 +174,7 @@ func TestUnmarshalJSON(t *testing.T) {
   "number": 4,
   "string": "x",
   "z": 1,
-  "a": "b{",
+  "a": "should not break with unclosed { character in value",
   "b": 3,
   "slice": [
     "1",
@@ -182,13 +182,14 @@ func TestUnmarshalJSON(t *testing.T) {
   ],
   "orderedmap": {
     "e": 1,
-    "a": 2,
+    "a { nested key with brace": "with a }}}} }} {{{ brace value",
 	"after": {
-		"link": "test"
+		"link": "test {{{ with even deeper nested braces }"
 	}
   },
   "test\"ing": 9,
-  "after": 1
+  "after": 1,
+  "should not break with { character in key": 1
 }`
 	o := New()
 	err := json.Unmarshal([]byte(s), &o)
@@ -206,6 +207,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		"orderedmap",
 		"test\"ing",
 		"after",
+		"should not break with { character in key",
 	}
 	k := o.Keys()
 	for i := range k {
@@ -217,7 +219,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	// nested 1 level deep
 	expectedKeys = []string{
 		"e",
-		"a",
+		"a { nested key with brace",
 		"after",
 	}
 	vi, ok := o.Get("orderedmap")

@@ -79,40 +79,65 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 	// Get the order of the keys
 	orderedKeys := []KeyIndex{}
 	for k, _ := range m {
-		escapedK := strings.Replace(k, `"`, `\"`, -1)
-		keyStr := `"` + escapedK + `":`
-		// Find the least-nested instance of keyStr
-		sections := strings.Split(s, keyStr)
-		depth := 0
-		openBraces := 0
-		closeBraces := 0
-		i := 0
-		for j, section := range sections {
-			i = i + len(section)
-			openBraces = openBraces + strings.Count(section, "{")
-			closeBraces = closeBraces + strings.Count(section, "}")
-			depth = depth + openBraces - closeBraces
-			if depth <= 1 {
+		kEscaped := strings.Replace(k, `"`, `\"`, -1)
+		kQuoted := `"` + kEscaped + `"`
+		// Find how much content exists before this key.
+		// If all content from this key and after is replaced with a close
+		// brace, it should still form a valid json string.
+		sTrimmed := s
+		for len(sTrimmed) > 0 {
+			lastIndex := strings.LastIndex(sTrimmed, kQuoted)
+			if lastIndex == -1 {
+				break
+			}
+			sTrimmed = sTrimmed[0:lastIndex]
+			sTrimmed = strings.TrimSpace(sTrimmed)
+			if len(sTrimmed) > 0 && sTrimmed[len(sTrimmed)-1] == ',' {
+				sTrimmed = sTrimmed[0:len(sTrimmed)-1]
+			}
+			maybeValidJson := sTrimmed + "}"
+			testMap := map[string]interface{}{}
+			err := json.Unmarshal([]byte(maybeValidJson), &testMap)
+			if err == nil {
+				// record the position of this key in s
 				ki := KeyIndex{
-					Key:   k,
-					Index: i,
+					Key: k,
+					Index: len(sTrimmed),
 				}
 				orderedKeys = append(orderedKeys, ki)
-				// check if value is nested map
-				if j < len(sections)-1 {
-					nextSectionUnclean := sections[j+1]
-					nextSection := strings.TrimSpace(nextSectionUnclean)
-					if string(nextSection[0]) == "{" {
-						// convert to orderedmap
+				// if the value for this key is a map, convert it to an orderedmap
+				startOfValueIndex := lastIndex + len(kQuoted)
+				valueStr := s[startOfValueIndex:len(s)-1]
+				valueStr = strings.TrimSpace(valueStr)
+				if len(valueStr) > 0 && valueStr[0] == ':' {
+					valueStr = valueStr[1:len(valueStr)]
+				}
+				valueStr = strings.TrimSpace(valueStr)
+				if valueStr[0] == '{' {
+					// find end of valueStr by removing everything after last }
+					// until it forms valid json
+					hasValidJson := true
+					subTestMap := map[string]interface{}{}
+					err = json.Unmarshal([]byte(valueStr), &subTestMap)
+					for len(valueStr) > 0 && err != nil {
+						lastCloseBrace := strings.LastIndex(valueStr, "}")
+						if lastCloseBrace == -1 {
+							hasValidJson = false
+							break
+						}
+						valueStr = valueStr[0:lastCloseBrace+1]
+						err = json.Unmarshal([]byte(valueStr), &subTestMap)
+					}
+					// convert to orderedmap
+					if hasValidJson {
 						mkTyped := m[k].(map[string]interface{})
 						oo := OrderedMap{}
-						mapToOrderedMap(&oo, nextSection, mkTyped)
+						mapToOrderedMap(&oo, valueStr, mkTyped)
 						m[k] = oo
 					}
 				}
 				break
 			}
-			i = i + len(k)
 		}
 	}
 	// Sort the keys
