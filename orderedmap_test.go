@@ -174,7 +174,7 @@ func TestUnmarshalJSON(t *testing.T) {
   "number": 4,
   "string": "x",
   "z": 1,
-  "a": "b",
+  "a": "b{",
   "b": 3,
   "slice": [
     "1",
