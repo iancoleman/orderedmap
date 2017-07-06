@@ -189,6 +189,11 @@ func TestUnmarshalJSON(t *testing.T) {
   },
   "test\"ing": 9,
   "after": 1,
+  "multitype_array": [
+    "test",
+	1,
+	{ "map": "obj", "it" : 5, ":colon in key": "colon: in value" }
+  ],
   "should not break with { character in key": 1
 }`
 	o := New()
@@ -207,6 +212,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		"orderedmap",
 		"test\"ing",
 		"after",
+		"multitype_array",
 		"should not break with { character in key",
 	}
 	k := o.Keys()
@@ -248,6 +254,24 @@ func TestUnmarshalJSON(t *testing.T) {
 			t.Error("Key order for nested map 2 deep", i, k[i], "!=", expectedKeys[i])
 		}
 	}
+	// multitype array
+	expectedKeys = []string{
+		"map",
+		"it",
+		":colon in key",
+	}
+	vislice, ok := o.Get("multitype_array")
+	if !ok {
+		t.Error("Missing key for multitype array")
+	}
+	vslice := vislice.([]interface{})
+	vmap := vslice[2].(OrderedMap)
+	k = vmap.Keys()
+	for i := range k {
+		if k[i] != expectedKeys[i] {
+			t.Error("Key order for nested map 2 deep", i, k[i], "!=", expectedKeys[i])
+		}
+	}
 }
 
 func TestUnmarshalJSONSpecialChars(t *testing.T) {
@@ -256,5 +280,69 @@ func TestUnmarshalJSONSpecialChars(t *testing.T) {
 	err := json.Unmarshal([]byte(s), &o)
 	if err != nil {
 		t.Error("JSON Unmarshal error with special chars", err)
+	}
+}
+
+func TestUnmarshalJSONArrayOfMaps(t *testing.T) {
+	s := `
+{
+  "name": "test",
+  "percent": 6,
+  "breakdown": [
+    {
+      "name": "a",
+      "percent": 0.9
+    },
+    {
+      "name": "b",
+      "percent": 0.9
+    },
+    {
+      "name": "d",
+      "percent": 0.4
+    },
+    {
+      "name": "e",
+      "percent": 2.7
+    }
+  ]
+}
+`
+	o := New()
+	err := json.Unmarshal([]byte(s), &o)
+	if err != nil {
+		t.Error("JSON Unmarshal error", err)
+	}
+	// Check the root keys
+	expectedKeys := []string{
+		"name",
+		"percent",
+		"breakdown",
+	}
+	k := o.Keys()
+	for i := range k {
+		if k[i] != expectedKeys[i] {
+			t.Error("Unmarshal root key order", i, k[i], "!=", expectedKeys[i])
+		}
+	}
+	// Check nested maps are converted to orderedmaps
+	// nested 1 level deep
+	expectedKeys = []string{
+		"name",
+		"percent",
+	}
+	vi, ok := o.Get("breakdown")
+	if !ok {
+		t.Error("Missing key for nested map 1 deep")
+	}
+	vs := vi.([]interface{})
+	for _, vInterface := range vs {
+		v := vInterface.(OrderedMap)
+		k = v.Keys()
+		for i := range k {
+			if k[i] != expectedKeys[i] {
+				t.Error("Key order for nested map 1 deep ", i, k[i], "!=", expectedKeys[i])
+			}
+		}
 	}
 }
