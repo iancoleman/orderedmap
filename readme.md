@@ -44,6 +44,14 @@ func main() {
     // all maps (including nested maps) will be parsed as orderedmaps
     s := `{"a": 1}`
     err := json.Unmarshal([]byte(s), &o)
+    
+    // sort the keys
+    o.SortKeys(sort.Strings)
+    
+    // sort by Pair
+    o.Sort(func(a *Pair, b *Pair) bool {
+        return a.Value().(float64) < b.Value().(float64)
+    })
 }
 ```
 
