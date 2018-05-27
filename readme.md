@@ -1,3 +1,5 @@
+# NOTE: THIS IS FOR TESTING ONLY, PLEASE USE github.com/fredwangwang/orderedmap
+
 # orderedmap
 
 A golang data type equivalent to python's collections.OrderedDict
