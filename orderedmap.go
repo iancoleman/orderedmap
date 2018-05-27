@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"fmt"
 )
 
 var NoValueError = errors.New("No value for this key")
@@ -75,15 +76,72 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (o *OrderedMap) UnmarshalYAML(b []byte) error {
+	m := map[string]interface{}{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	s := string(b)
+	mapToOrderedMap(o, s, m)
+	return nil
+}
+
+func findClosingBraces(str string, left byte, right byte) int {
+	mark := 1
+	isLiteral := false
+	i := 1
+
+	for ; i < len(str); i++ {
+		if str[i] == '\\' {
+			// consume the next symbol
+			i++
+		} else if str[i] == '"' {
+			isLiteral = !isLiteral
+		} else if !isLiteral {
+			if str[i] == left {
+				mark++
+			} else if str[i] == right {
+				mark--
+			}
+		}
+		if mark == 0 {
+			break
+		}
+	}
+	return i
+}
+
+func parseSliceInMap(o *OrderedMap, str string, content []interface{}) {
+	for i, item := range content {
+		switch itemTyped := item.(type) {
+		case map[string]interface{}: // map
+			oo := OrderedMap{}
+			str = str[strings.IndexByte(str, '{'):]
+			idx := findClosingBraces(str, '{', '}') + 1
+			mapToOrderedMap(&oo, str[:idx], itemTyped)
+			content[i] = oo
+			str = str[idx:]
+		case []interface{}: // slice
+			str = str[strings.IndexByte(str, '['):]
+			idx := findClosingBraces(str, '[', ']') + 1
+			parseSliceInMap(o, str[:idx], itemTyped)
+			str = str[idx:]
+		default: // scalar
+			itemStr := fmt.Sprint(itemTyped)
+			itemIdx := strings.Index(str, itemStr)
+			str = str[itemIdx+len(itemStr)+1:]
+		}
+	}
+}
+
 func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
-	// Get the order of the keys
 	orderedKeys := []KeyIndex{}
+	genericMap := map[string]interface{}{}
+
+	// get all the keys sorted out first
 	for k, _ := range m {
 		kEscaped := strings.Replace(k, `"`, `\"`, -1)
 		kQuoted := `"` + kEscaped + `"`
-		// Find how much content exists before this key.
-		// If all content from this key and after is replaced with a close
-		// brace, it should still form a valid json string.
 		sTrimmed := s
 		for len(sTrimmed) > 0 {
 			lastIndex := strings.LastIndex(sTrimmed, kQuoted)
@@ -91,124 +149,50 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 				break
 			}
 			sTrimmed = sTrimmed[0:lastIndex]
-			sTrimmed = strings.TrimSpace(sTrimmed)
-			if len(sTrimmed) > 0 && sTrimmed[len(sTrimmed)-1] == ',' {
-				sTrimmed = sTrimmed[0 : len(sTrimmed)-1]
-			}
+			sTrimmed = strings.TrimRight(sTrimmed, ", \n\r\t")
 			maybeValidJson := sTrimmed + "}"
-			testMap := map[string]interface{}{}
-			err := json.Unmarshal([]byte(maybeValidJson), &testMap)
+
+			// If we can successfully unmarshal the previous part, it means the match is a top-level key
+			err := json.Unmarshal([]byte(maybeValidJson), &genericMap)
 			if err == nil {
 				// record the position of this key in s
 				ki := KeyIndex{
 					Key:   k,
-					Index: len(sTrimmed),
+					Index: lastIndex,
 				}
 				orderedKeys = append(orderedKeys, ki)
-				// shorten the string to get the next key
-				startOfValueIndex := lastIndex + len(kQuoted)
-				valueStr := s[startOfValueIndex : len(s)-1]
-				valueStr = strings.TrimSpace(valueStr)
-				if len(valueStr) > 0 && valueStr[0] == ':' {
-					valueStr = valueStr[1:len(valueStr)]
-				}
-				valueStr = strings.TrimSpace(valueStr)
-				if valueStr[0] == '{' {
-					// if the value for this key is a map, convert it to an orderedmap.
-					// find end of valueStr by removing everything after last }
-					// until it forms valid json
-					hasValidJson := false
-					i := 1
-					for i < len(valueStr) && !hasValidJson {
-						if valueStr[i] != '}' {
-							i = i + 1
-							continue
-						}
-						subTestMap := map[string]interface{}{}
-						testValue := valueStr[0 : i+1]
-						err = json.Unmarshal([]byte(testValue), &subTestMap)
-						if err == nil {
-							hasValidJson = true
-							valueStr = testValue
-							break
-						}
-						i = i + 1
-					}
-					// convert to orderedmap
-					if hasValidJson {
-						mkTyped := m[k].(map[string]interface{})
-						oo := OrderedMap{}
-						mapToOrderedMap(&oo, valueStr, mkTyped)
-						m[k] = oo
-					}
-				} else if valueStr[0] == '[' {
-					// if the value for this key is a []interface, convert any map items to an orderedmap.
-					// find end of valueStr by removing everything after last ]
-					// until it forms valid json
-					hasValidJson := false
-					i := 1
-					for i < len(valueStr) && !hasValidJson {
-						if valueStr[i] != ']' {
-							i = i + 1
-							continue
-						}
-						subTestSlice := []interface{}{}
-						testValue := valueStr[0 : i+1]
-						err = json.Unmarshal([]byte(testValue), &subTestSlice)
-						if err == nil {
-							hasValidJson = true
-							valueStr = testValue
-							break
-						}
-						i = i + 1
-					}
-					if hasValidJson {
-						itemsStr := valueStr[1 : len(valueStr)-1]
-						// get next item in the slice
-						itemIndex := 0
-						startItem := 0
-						endItem := 0
-						for endItem < len(itemsStr) {
-							if itemsStr[endItem] != ',' && endItem < len(itemsStr)-1 {
-								endItem = endItem + 1
-								continue
-							}
-							// if this substring compiles to json, it's the next item
-							possibleItemStr := strings.TrimSpace(itemsStr[startItem:endItem])
-							var possibleItem interface{}
-							err = json.Unmarshal([]byte(possibleItemStr), &possibleItem)
-							if err != nil {
-								endItem = endItem + 1
-								continue
-							}
-							// if item is map, convert to orderedmap
-							if possibleItemStr[0] == '{' {
-								mkTyped := m[k].([]interface{})
-								mkiTyped := mkTyped[itemIndex].(map[string]interface{})
-								oo := OrderedMap{}
-								mapToOrderedMap(&oo, possibleItemStr, mkiTyped)
-								// replace original map with orderedmap
-								mkTyped[itemIndex] = oo
-								m[k] = mkTyped
-							}
-							// remove this item from itemsStr
-							startItem = endItem + 1
-							endItem = endItem + 1
-							itemIndex = itemIndex + 1
-						}
-					}
-				}
 				break
 			}
 		}
 	}
-	// Sort the keys
+	orderedKeys = append(orderedKeys, KeyIndex{Key: "", Index: len(s) - 1})
 	sort.Sort(ByIndex(orderedKeys))
-	// Convert sorted keys to string slice
+
+	for i := 0; i < len(orderedKeys)-1; i++ {
+		contentKey := orderedKeys[i].Key
+		contentKeyEscaped := `"` + strings.Replace(contentKey, `"`, `\"`, -1) + `"`
+		contentEnd := orderedKeys[i+1].Index
+		contentStart := orderedKeys[i].Index + len(contentKeyEscaped)
+		contentStr := strings.Trim(s[contentStart:contentEnd], " \n\r:,")
+
+		switch contentTyped := m[contentKey].(type) {
+		case map[string]interface{}:
+			oo := OrderedMap{}
+			mapToOrderedMap(&oo, contentStr, contentTyped)
+			m[contentKey] = oo
+		case []interface{}:
+			parseSliceInMap(o, contentStr, contentTyped)
+		}
+
+	}
+
 	k := []string{}
 	for _, ki := range orderedKeys {
-		k = append(k, ki.Key)
+		if ki.Key != "" {
+			k = append(k, ki.Key)
+		}
 	}
+
 	// Set the OrderedMap values
 	o.values = m
 	o.keys = k
