@@ -19,6 +19,28 @@ func (a ByIndex) Len() int           { return len(a) }
 func (a ByIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByIndex) Less(i, j int) bool { return a[i].Index < a[j].Index }
 
+type Pair struct {
+	key string
+	value interface{}
+}
+
+func (kv *Pair) Key() string {
+	return kv.key
+}
+
+func (kv *Pair) Value() interface{} {
+	return kv.value
+}
+
+type ByPair struct {
+	Pairs []*Pair
+	LessFunc func(a *Pair, j *Pair) bool
+}
+
+func (a ByPair) Len() int           { return len(a.Pairs) }
+func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pairs[i] }
+func (a ByPair) Less(i, j int) bool { return a.LessFunc(a.Pairs[i], a.Pairs[j]) }
+
 type OrderedMap struct {
 	keys   []string
 	values map[string]interface{}
@@ -63,6 +85,25 @@ func (o *OrderedMap) Delete(key string) {
 
 func (o *OrderedMap) Keys() []string {
 	return o.keys
+}
+
+// SortKeys Sort the map keys using your sort func
+func (o *OrderedMap) SortKeys(sortFunc func(keys []string)) {
+	sortFunc(o.keys)
+}
+
+// Sort Sort the map using your sort func
+func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
+	pairs := make([]*Pair, len(o.keys))
+	for i, key := range o.keys {
+		pairs[i] = &Pair{key, o.values[key]}
+	}
+
+	sort.Sort(ByPair{pairs, lessFunc})
+
+	for i, pair := range pairs {
+		o.keys[i] = pair.key
+	}
 }
 
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
