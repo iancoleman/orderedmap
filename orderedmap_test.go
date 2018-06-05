@@ -7,6 +7,21 @@ import (
 	"sort"
 )
 
+func TestFindClosingBraces(t *testing.T) {
+	s := `{
+    "e\'\{": 1,
+    "\"}a\}}}} nested ke{{}}}y with brace": "with a }}}} }} {{{ brace value",
+	"after": {
+		"link": "test }}}}}}{{{ with even deeper nested braces }"
+	}
+  }`
+	idx := findClosingBraces(s,'{','}')
+	if idx != len(s)-1 {
+		fmt.Println(idx)
+		t.Error("findClosingBraces found wrong place")
+	}
+}
+
 func TestOrderedMap(t *testing.T) {
 	o := New()
 	// number
@@ -193,7 +208,8 @@ func TestUnmarshalJSON(t *testing.T) {
   "multitype_array": [
     "test",
 	1,
-	{ "map": "obj", "it" : 5, ":colon in key": "colon: in value" }
+	{ "map": "obj", "it" : 5, ":colon in key": "colon: in value" },
+	[{"inner": "map"}]
   ],
   "should not break with { character in key": 1
 }`
@@ -271,6 +287,16 @@ func TestUnmarshalJSON(t *testing.T) {
 	for i := range k {
 		if k[i] != expectedKeys[i] {
 			t.Error("Key order for nested map 2 deep", i, k[i], "!=", expectedKeys[i])
+		}
+	}
+
+	expectedKeys = []string{"inner"}
+	vinnerslice := vslice[3].([]interface{})
+	vinnermap := vinnerslice[0].(OrderedMap)
+	k = vinnermap.Keys()
+	for i := range k {
+		if k[i] != expectedKeys[i] {
+			t.Error("Key order for nested map 3 deep", i, k[i], "!=", expectedKeys[i])
 		}
 	}
 }
