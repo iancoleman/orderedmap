@@ -20,7 +20,7 @@ func (a ByIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByIndex) Less(i, j int) bool { return a[i].Index < a[j].Index }
 
 type Pair struct {
-	key string
+	key   string
 	value interface{}
 }
 
@@ -33,7 +33,7 @@ func (kv *Pair) Value() interface{} {
 }
 
 type ByPair struct {
-	Pairs []*Pair
+	Pairs    []*Pair
 	LessFunc func(a *Pair, j *Pair) bool
 }
 
@@ -107,16 +107,21 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 }
 
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
-	m := map[string]interface{}{}
-	if err := json.Unmarshal(b, &m); err != nil {
+	var err error
+	err = mapStringToOrderedMap(string(b), o)
+	if err != nil {
 		return err
 	}
-	s := string(b)
-	mapToOrderedMap(o, s, m)
 	return nil
 }
 
-func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
+func mapStringToOrderedMap(s string, o *OrderedMap) error {
+	// parse string into map
+	m := map[string]interface{}{}
+	err := json.Unmarshal([]byte(s), &m)
+	if err != nil {
+		return err
+	}
 	// Get the order of the keys
 	orderedKeys := []KeyIndex{}
 	for k, _ := range m {
@@ -155,7 +160,7 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 				}
 				valueStr = strings.TrimSpace(valueStr)
 				if valueStr[0] == '{' {
-					// if the value for this key is a map, convert it to an orderedmap.
+					// if the value for this key is a map
 					// find end of valueStr by removing everything after last }
 					// until it forms valid json
 					hasValidJson := false
@@ -176,14 +181,17 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 						i = i + 1
 					}
 					// convert to orderedmap
+					// this may be recursive it values in the map are also maps
 					if hasValidJson {
-						mkTyped := m[k].(map[string]interface{})
-						oo := OrderedMap{}
-						mapToOrderedMap(&oo, valueStr, mkTyped)
-						m[k] = oo
+						newMap := New()
+						err := mapStringToOrderedMap(valueStr, newMap)
+						if err != nil {
+							return err
+						}
+						m[k] = *newMap
 					}
 				} else if valueStr[0] == '[' {
-					// if the value for this key is a []interface, convert any map items to an orderedmap.
+					// if the value for this key is a slice
 					// find end of valueStr by removing everything after last ]
 					// until it forms valid json
 					hasValidJson := false
@@ -203,41 +211,19 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 						}
 						i = i + 1
 					}
+					// convert to slice with any map items converted to
+					// orderedmaps
+					// this may be recursive if values in the slice are slices
 					if hasValidJson {
-						itemsStr := valueStr[1 : len(valueStr)-1]
-						// get next item in the slice
-						itemIndex := 0
-						startItem := 0
-						endItem := 0
-						for endItem < len(itemsStr) {
-							if itemsStr[endItem] != ',' && endItem < len(itemsStr)-1 {
-								endItem = endItem + 1
-								continue
-							}
-							// if this substring compiles to json, it's the next item
-							possibleItemStr := strings.TrimSpace(itemsStr[startItem:endItem])
-							var possibleItem interface{}
-							err = json.Unmarshal([]byte(possibleItemStr), &possibleItem)
-							if err != nil {
-								endItem = endItem + 1
-								continue
-							}
-							// if item is map, convert to orderedmap
-							if possibleItemStr[0] == '{' {
-								mkTyped := m[k].([]interface{})
-								mkiTyped := mkTyped[itemIndex].(map[string]interface{})
-								oo := OrderedMap{}
-								mapToOrderedMap(&oo, possibleItemStr, mkiTyped)
-								// replace original map with orderedmap
-								mkTyped[itemIndex] = oo
-								m[k] = mkTyped
-							}
-							// remove this item from itemsStr
-							startItem = endItem + 1
-							endItem = endItem + 1
-							itemIndex = itemIndex + 1
+						var newSlice []interface{}
+						err := sliceStringToSliceWithOrderedMaps(valueStr, &newSlice)
+						if err != nil {
+							return err
 						}
+						m[k] = newSlice
 					}
+				} else {
+					o.Set(k, m[k])
 				}
 				break
 			}
@@ -253,6 +239,69 @@ func mapToOrderedMap(o *OrderedMap, s string, m map[string]interface{}) {
 	// Set the OrderedMap values
 	o.values = m
 	o.keys = k
+	return nil
+}
+
+func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{}) error {
+	// if the value for this key is a []interface, convert any map items to an orderedmap.
+	// find end of valueStr by removing everything after last ]
+	// until it forms valid json
+	itemsStr := strings.TrimSpace(valueStr)
+	itemsStr = itemsStr[1 : len(itemsStr)-1]
+	// get next item in the slice
+	itemIndex := 0
+	startItem := 0
+	endItem := 0
+	for endItem <= len(itemsStr) {
+		couldBeItemEnd := false
+		couldBeItemEnd = couldBeItemEnd || endItem == len(itemsStr)
+		couldBeItemEnd = couldBeItemEnd || (endItem < len(itemsStr) && itemsStr[endItem] == ',')
+		if !couldBeItemEnd {
+			endItem = endItem + 1
+			continue
+		}
+		// if this substring compiles to json, it's the next item
+		possibleItemStr := strings.TrimSpace(itemsStr[startItem:endItem])
+		var possibleItem interface{}
+		err := json.Unmarshal([]byte(possibleItemStr), &possibleItem)
+		if err != nil {
+			endItem = endItem + 1
+			continue
+		}
+		if possibleItemStr[0] == '{' {
+			// if item is map, convert to orderedmap
+			oo := New()
+			err := mapStringToOrderedMap(possibleItemStr, oo)
+			if err != nil {
+				return err
+			}
+			// add new orderedmap item to new slice
+			slice := *newSlice
+			slice = append(slice, *oo)
+			*newSlice = slice
+		} else if possibleItemStr[0] == '[' {
+			// if item is slice, convert to slice with orderedmaps
+			var newItem []interface{}
+			err := sliceStringToSliceWithOrderedMaps(possibleItemStr, &newItem)
+			if err != nil {
+				return err
+			}
+			// replace original slice item with new slice
+			slice := *newSlice
+			slice = append(slice, newItem)
+			*newSlice = slice
+		} else {
+			// any non-slice and non-map item, just add json parsed item
+			slice := *newSlice
+			slice = append(slice, possibleItem)
+			*newSlice = slice
+		}
+		// remove this item from itemsStr
+		startItem = endItem + 1
+		endItem = endItem + 1
+		itemIndex = itemIndex + 1
+	}
+	return nil
 }
 
 func (o OrderedMap) MarshalJSON() ([]byte, error) {

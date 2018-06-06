@@ -3,8 +3,8 @@ package orderedmap
 import (
 	"encoding/json"
 	"fmt"
-	"testing"
 	"sort"
+	"testing"
 )
 
 func TestOrderedMap(t *testing.T) {
@@ -193,7 +193,8 @@ func TestUnmarshalJSON(t *testing.T) {
   "multitype_array": [
     "test",
 	1,
-	{ "map": "obj", "it" : 5, ":colon in key": "colon: in value" }
+	{ "map": "obj", "it" : 5, ":colon in key": "colon: in value" },
+	[{"inner": "map"}]
   ],
   "should not break with { character in key": 1
 }`
@@ -271,6 +272,18 @@ func TestUnmarshalJSON(t *testing.T) {
 	for i := range k {
 		if k[i] != expectedKeys[i] {
 			t.Error("Key order for nested map 2 deep", i, k[i], "!=", expectedKeys[i])
+		}
+	}
+	// nested map 3 deep
+	vislice, _ = o.Get("multitype_array")
+	vslice = vislice.([]interface{})
+	expectedKeys = []string{"inner"}
+	vinnerslice := vslice[3].([]interface{})
+	vinnermap := vinnerslice[0].(OrderedMap)
+	k = vinnermap.Keys()
+	for i := range k {
+		if k[i] != expectedKeys[i] {
+			t.Error("Key order for nested map 3 deep", i, k[i], "!=", expectedKeys[i])
 		}
 	}
 }
