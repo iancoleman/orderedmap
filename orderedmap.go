@@ -8,6 +8,7 @@ import (
 )
 
 var NoValueError = errors.New("No value for this key")
+var Done = errors.New("no more items in iterator")
 
 type KeyIndex struct {
 	Key   string
@@ -20,7 +21,7 @@ func (a ByIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByIndex) Less(i, j int) bool { return a[i].Index < a[j].Index }
 
 type Pair struct {
-	key string
+	key   string
 	value interface{}
 }
 
@@ -33,13 +34,15 @@ func (kv *Pair) Value() interface{} {
 }
 
 type ByPair struct {
-	Pairs []*Pair
+	Pairs    []*Pair
 	LessFunc func(a *Pair, j *Pair) bool
 }
 
 func (a ByPair) Len() int           { return len(a.Pairs) }
 func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pairs[i] }
 func (a ByPair) Less(i, j int) bool { return a.LessFunc(a.Pairs[i], a.Pairs[j]) }
+
+
 
 type OrderedMap struct {
 	keys   []string
@@ -56,6 +59,11 @@ func New() *OrderedMap {
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
 	val, exists := o.values[key]
 	return val, exists
+}
+
+func (o *OrderedMap) Has(key string) bool {
+	_, exists := o.values[key]
+	return exists
 }
 
 func (o *OrderedMap) Set(key string, value interface{}) {
@@ -104,6 +112,27 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 	for i, pair := range pairs {
 		o.keys[i] = pair.key
 	}
+}
+
+func (o *OrderedMap) iterValues() func() (interface{}, bool) {
+	i, max := 0, len(o.keys)
+
+	return func() (interface{}, bool) {
+		if i < max {
+			v := o.values[o.keys[i]]
+			i++
+			return v, false
+		}
+		return nil, true
+	}
+}
+
+func (o *OrderedMap) IterValues() *ValuesIterator {
+	return &ValuesIterator{o, 0, len(o.keys)}
+}
+
+func (o *OrderedMap) Iter() *PairsIterator {
+	return &PairsIterator{o, 0, len(o.keys)}
 }
 
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
