@@ -114,17 +114,14 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 	}
 }
 
-func (o *OrderedMap) iterValues() func() (interface{}, bool) {
-	i, max := 0, len(o.keys)
-
-	return func() (interface{}, bool) {
-		if i < max {
-			v := o.values[o.keys[i]]
-			i++
-			return v, false
+func (o *OrderedMap) EachValues(cb func(value interface{}) error) (err error) {
+	for i, max := 0, len(o.keys); i < max; i++ {
+		err = cb(o.values[o.keys[i]])
+		if err != nil {
+			return err
 		}
-		return nil, true
 	}
+	return
 }
 
 func (o *OrderedMap) IterValues() *ValuesIterator {
