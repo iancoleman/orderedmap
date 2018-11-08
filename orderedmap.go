@@ -107,6 +107,9 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 }
 
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
+	if o.values == nil {
+		o.values = map[string]interface{}{}
+	}
 	var err error
 	err = mapStringToOrderedMap(string(b), o)
 	if err != nil {
