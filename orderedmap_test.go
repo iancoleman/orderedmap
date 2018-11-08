@@ -361,6 +361,24 @@ func TestUnmarshalJSONArrayOfMaps(t *testing.T) {
 	}
 }
 
+func TestUnmarshalJSONStruct(t *testing.T) {
+	var v struct {
+		Data *OrderedMap `json:"data"`
+	}
+
+	err := json.Unmarshal([]byte(`{ "data": { "x": 1 } }`), &v)
+	if err != nil {
+		t.Fatalf("JSON unmarshal error: %v", err)
+	}
+
+	x, ok := v.Data.Get("x")
+	if !ok {
+		t.Errorf("missing expected key")
+	} else if x != float64(1) {
+		t.Errorf("unexpected value: %#v", x)
+	}
+}
+
 func TestOrderedMap_SortKeys(t *testing.T) {
 	s := `
 {
