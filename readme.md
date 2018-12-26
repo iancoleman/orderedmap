@@ -8,7 +8,7 @@ Can be JSON serialized / deserialized
 
 # Usage
 
-```
+```go
 package main
 
 import (
