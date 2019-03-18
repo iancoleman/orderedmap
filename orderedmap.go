@@ -218,7 +218,7 @@ func mapStringToOrderedMap(s string, o *OrderedMap) error {
 					// orderedmaps
 					// this may be recursive if values in the slice are slices
 					if hasValidJson {
-						var newSlice []interface{}
+						newSlice := []interface{}{}
 						err := sliceStringToSliceWithOrderedMaps(valueStr, &newSlice)
 						if err != nil {
 							return err
@@ -284,7 +284,7 @@ func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{})
 			*newSlice = slice
 		} else if possibleItemStr[0] == '[' {
 			// if item is slice, convert to slice with orderedmaps
-			var newItem []interface{}
+			newItem := []interface{}{}
 			err := sliceStringToSliceWithOrderedMaps(possibleItemStr, &newItem)
 			if err != nil {
 				return err
