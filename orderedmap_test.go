@@ -433,3 +433,18 @@ func TestOrderedMap_Sort(t *testing.T) {
 		}
 	}
 }
+
+// https://github.com/iancoleman/orderedmap/issues/11
+func TestOrderedMap_empty_array(t *testing.T) {
+	srcStr := `{"x":[]}`
+	src := []byte(srcStr)
+	om := New()
+	json.Unmarshal(src, om)
+	bs, _ := json.Marshal(om)
+	marshalledStr := string(bs)
+	if marshalledStr != srcStr {
+		t.Error("Empty array does not serialise to json correctly")
+		t.Error("Expect", srcStr)
+		t.Error("Got", marshalledStr)
+	}
+}
