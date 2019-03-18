@@ -448,3 +448,20 @@ func TestOrderedMap_empty_array(t *testing.T) {
 		t.Error("Got", marshalledStr)
 	}
 }
+
+// Inspired by
+// https://github.com/iancoleman/orderedmap/issues/11
+// but using empty maps instead of empty slices
+func TestOrderedMap_empty_map(t *testing.T) {
+	srcStr := `{"x":{}}`
+	src := []byte(srcStr)
+	om := New()
+	json.Unmarshal(src, om)
+	bs, _ := json.Marshal(om)
+	marshalledStr := string(bs)
+	if marshalledStr != srcStr {
+		t.Error("Empty map does not serialise to json correctly")
+		t.Error("Expect", srcStr)
+		t.Error("Got", marshalledStr)
+	}
+}
