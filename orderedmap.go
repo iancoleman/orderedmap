@@ -42,8 +42,9 @@ func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pai
 func (a ByPair) Less(i, j int) bool { return a.LessFunc(a.Pairs[i], a.Pairs[j]) }
 
 type OrderedMap struct {
-	keys   []string
-	values map[string]interface{}
+	keys      []string
+	values    map[string]interface{}
+	useNumber bool
 }
 
 func New() *OrderedMap {
@@ -52,7 +53,9 @@ func New() *OrderedMap {
 	o.values = map[string]interface{}{}
 	return &o
 }
-
+func (o *OrderedMap) UseNumber() {
+	o.useNumber = true
+}
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
 	val, exists := o.values[key]
 	return val, exists
@@ -121,7 +124,11 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 func mapStringToOrderedMap(s string, o *OrderedMap) error {
 	// parse string into map
 	m := map[string]interface{}{}
-	err := json.Unmarshal([]byte(s), &m)
+	d := json.NewDecoder(strings.NewReader(s))
+	if o.useNumber {
+		d.UseNumber()
+	}
+	err := d.Decode(&m)
 	if err != nil {
 		return err
 	}

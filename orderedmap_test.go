@@ -3,7 +3,9 @@ package orderedmap
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -463,5 +465,18 @@ func TestOrderedMap_empty_map(t *testing.T) {
 		t.Error("Empty map does not serialise to json correctly")
 		t.Error("Expect", srcStr)
 		t.Error("Got", marshalledStr)
+	}
+}
+
+func TestOrderedMap_UseNumber(t *testing.T) {
+	srcStr := `{"x":1}`
+	om := New()
+	d := json.NewDecoder(strings.NewReader(srcStr))
+	om.UseNumber()
+	d.Decode(om)
+	if v, ok := om.Get("x"); ok {
+		if _, ok := v.(json.Number); !ok {
+			t.Errorf("Expect type is json.Number, got %v", reflect.TypeOf(v))
+		}
 	}
 }
