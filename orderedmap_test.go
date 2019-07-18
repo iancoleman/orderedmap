@@ -469,14 +469,17 @@ func TestOrderedMap_empty_map(t *testing.T) {
 }
 
 func TestOrderedMap_UseNumber(t *testing.T) {
-	srcStr := `{"x":1}`
+	srcStr := `{"x": {"y": 1.0}}`
 	om := New()
 	d := json.NewDecoder(strings.NewReader(srcStr))
 	om.UseNumber()
 	d.Decode(om)
 	if v, ok := om.Get("x"); ok {
-		if _, ok := v.(json.Number); !ok {
-			t.Errorf("Expect type is json.Number, got %v", reflect.TypeOf(v))
+		vv := v.(OrderedMap)
+		if vvv, ok := vv.Get("y"); ok {
+			if _, ok := vvv.(json.Number); !ok {
+				t.Errorf("Expect type is json.Number, got %v", reflect.TypeOf(vvv))
+			}
 		}
 	}
 }

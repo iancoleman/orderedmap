@@ -194,6 +194,9 @@ func mapStringToOrderedMap(s string, o *OrderedMap) error {
 					// this may be recursive it values in the map are also maps
 					if hasValidJson {
 						newMap := New()
+						if o.useNumber {
+							newMap.UseNumber()
+						}
 						err := mapStringToOrderedMap(valueStr, newMap)
 						if err != nil {
 							return err
