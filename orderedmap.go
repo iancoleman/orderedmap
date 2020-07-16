@@ -1,6 +1,7 @@
 package orderedmap
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"sort"
@@ -42,15 +43,21 @@ func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pai
 func (a ByPair) Less(i, j int) bool { return a.LessFunc(a.Pairs[i], a.Pairs[j]) }
 
 type OrderedMap struct {
-	keys   []string
-	values map[string]interface{}
+	keys       []string
+	values     map[string]interface{}
+	escapeHTML bool
 }
 
 func New() *OrderedMap {
 	o := OrderedMap{}
 	o.keys = []string{}
 	o.values = map[string]interface{}{}
+	o.escapeHTML = true
 	return &o
+}
+
+func (o *OrderedMap) SetEscapeHTML(on bool) {
+	o.escapeHTML = on
 }
 
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
@@ -315,11 +322,14 @@ func (o OrderedMap) MarshalJSON() ([]byte, error) {
 		s = s + `"` + kEscaped + `":`
 		// add value
 		v := o.values[k]
-		vBytes, err := json.Marshal(v)
+		buffer := new(bytes.Buffer)
+		encoder := json.NewEncoder(buffer)
+		encoder.SetEscapeHTML(o.escapeHTML)
+		err := encoder.Encode(v)
 		if err != nil {
 			return []byte{}, err
 		}
-		s = s + string(vBytes) + ","
+		s = s + buffer.String() + ","
 	}
 	if len(o.keys) > 0 {
 		s = s[0 : len(s)-1]

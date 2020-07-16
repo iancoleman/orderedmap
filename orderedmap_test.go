@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -113,6 +114,8 @@ func TestMarshalJSON(t *testing.T) {
 	o.Set("number", 3)
 	// string
 	o.Set("string", "x")
+	// string
+	o.Set("specialstring", "\\.<>[]{}_-")
 	// new value keeps key in old position
 	o.Set("number", 4)
 	// keys not sorted alphabetically
@@ -138,7 +141,7 @@ func TestMarshalJSON(t *testing.T) {
 	}
 	s := string(b)
 	// check json is correctly ordered
-	if s != `{"number":4,"string":"x","z":1,"a":2,"b":3,"slice":["1",1],"orderedmap":{"e":1,"a":2},"test\"ing":9}` {
+	if s != `{"number":4,"string":"x","specialstring":"\\.\u003c\u003e[]{}_-","z":1,"a":2,"b":3,"slice":["1",1],"orderedmap":{"e":1,"a":2},"test\"ing":9}` {
 		t.Error("JSON Marshal value is incorrect", s)
 	}
 	// convert to indented json
@@ -150,6 +153,7 @@ func TestMarshalJSON(t *testing.T) {
 	ei := `{
   "number": 4,
   "string": "x",
+  "specialstring": "\\.\u003c\u003e[]{}_-",
   "z": 1,
   "a": 2,
   "b": 3,
@@ -167,6 +171,23 @@ func TestMarshalJSON(t *testing.T) {
 		fmt.Println(ei)
 		fmt.Println(si)
 		t.Error("JSON MarshalIndent value is incorrect", si)
+	}
+}
+
+func TestMarshalJSONNoEscapeHTML(t *testing.T) {
+	o := New()
+	o.SetEscapeHTML(false)
+	// string special characters
+	o.Set("specialstring", "\\.<>[]{}_-")
+	// convert to json
+	b, err := o.MarshalJSON()
+	if err != nil {
+		t.Error("Marshalling json", err)
+	}
+	s := strings.Replace(string(b), "\n", "", -1)
+	// check json is correctly ordered
+	if s != `{"specialstring":"\\.<>[]{}_-"}` {
+		t.Error("JSON Marshal value is incorrect", s)
 	}
 }
 

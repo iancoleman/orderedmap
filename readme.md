@@ -21,8 +21,14 @@ func main() {
     // use New() instead of o := map[string]interface{}{}
     o := orderedmap.New()
 
+    // use SetEscapeHTML() to whether escape problematic HTML characters or not, defaults is true
+    o.SetEscapeHTML(false)
+
     // use Set instead of o["a"] = 1
     o.Set("a", 1)
+
+    // add some value with special characters
+    o.Set("b", "\\.<>[]{}_-")
 
     // use Get instead of i, ok := o["a"]
     val, ok := o.Get("a")
@@ -44,10 +50,10 @@ func main() {
     // all maps (including nested maps) will be parsed as orderedmaps
     s := `{"a": 1}`
     err := json.Unmarshal([]byte(s), &o)
-    
+
     // sort the keys
     o.SortKeys(sort.Strings)
-    
+
     // sort by Pair
     o.Sort(func(a *Pair, b *Pair) bool {
         return a.Value().(float64) < b.Value().(float64)
