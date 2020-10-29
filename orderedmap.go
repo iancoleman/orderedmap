@@ -9,6 +9,7 @@ import (
 )
 
 var NoValueError = errors.New("No value for this key")
+var Done = errors.New("no more items in iterator")
 
 type KeyIndex struct {
 	Key   string
@@ -42,6 +43,8 @@ func (a ByPair) Len() int           { return len(a.Pairs) }
 func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pairs[i] }
 func (a ByPair) Less(i, j int) bool { return a.LessFunc(a.Pairs[i], a.Pairs[j]) }
 
+
+
 type OrderedMap struct {
 	keys       []string
 	values     map[string]interface{}
@@ -63,6 +66,11 @@ func (o *OrderedMap) SetEscapeHTML(on bool) {
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
 	val, exists := o.values[key]
 	return val, exists
+}
+
+func (o *OrderedMap) Has(key string) bool {
+	_, exists := o.values[key]
+	return exists
 }
 
 func (o *OrderedMap) Set(key string, value interface{}) {
@@ -111,6 +119,24 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 	for i, pair := range pairs {
 		o.keys[i] = pair.key
 	}
+}
+
+func (o *OrderedMap) EachValues(cb func(value interface{}) error) (err error) {
+	for i, max := 0, len(o.keys); i < max; i++ {
+		err = cb(o.values[o.keys[i]])
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+func (o *OrderedMap) IterValues() *ValuesIterator {
+	return &ValuesIterator{o, 0, len(o.keys)}
+}
+
+func (o *OrderedMap) Iter() *PairsIterator {
+	return &PairsIterator{o, 0, len(o.keys)}
 }
 
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
