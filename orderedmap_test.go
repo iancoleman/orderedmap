@@ -400,6 +400,50 @@ func TestUnmarshalJSONStruct(t *testing.T) {
 	}
 }
 
+func TestRemarshalJSONWithoutUseNumber(t *testing.T) {
+	// 9007199254740993 is the smallest integer which cannot be represented exactly as a float64
+	const input = `{"data":{"x":9007199254740993}}`
+	const expected = `{"data":{"x":9007199254740992}}`
+
+	o := New()
+	o.SetUseNumber(false)
+
+	err := json.Unmarshal([]byte(input), &o)
+	if err != nil {
+		t.Fatalf("JSON unmarshal error: %v", err)
+	}
+
+	marshalled, err := json.Marshal(o)
+	if err != nil {
+		t.Errorf("Marshal failed: %v", err)
+	}
+
+	if string(marshalled) != expected {
+		t.Errorf("unexpected value: %s instead of %s", marshalled, expected)
+	}
+}
+
+func TestRemarshalJSONUseNumber(t *testing.T) {
+	const input = `{"data":{"x":9007199254740993}}`
+
+	o := New()
+	o.SetUseNumber(true)
+
+	err := json.Unmarshal([]byte(input), &o)
+	if err != nil {
+		t.Fatalf("JSON unmarshal error: %v", err)
+	}
+
+	marshalled, err := json.Marshal(o)
+	if err != nil {
+		t.Errorf("Marshal failed: %v", err)
+	}
+
+	if string(marshalled) != input {
+		t.Errorf("unexpected value: %s instead of %s", marshalled, input)
+	}
+}
+
 func TestOrderedMap_SortKeys(t *testing.T) {
 	s := `
 {
