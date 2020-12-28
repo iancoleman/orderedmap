@@ -46,6 +46,7 @@ type OrderedMap struct {
 	keys       []string
 	values     map[string]interface{}
 	escapeHTML bool
+	useNumber bool
 }
 
 func New() *OrderedMap {
@@ -58,6 +59,10 @@ func New() *OrderedMap {
 
 func (o *OrderedMap) SetEscapeHTML(on bool) {
 	o.escapeHTML = on
+}
+
+func (o *OrderedMap) SetUseNumber(on bool) {
+	o.useNumber = on
 }
 
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
@@ -125,13 +130,34 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func mapStringToOrderedMap(s string, o *OrderedMap) error {
-	// parse string into map
-	m := map[string]interface{}{}
-	err := json.Unmarshal([]byte(s), &m)
+func unmarshalJSONUseNumber(s string, v interface{}) error {
+	r := strings.NewReader(s)
+	decoder := json.NewDecoder(r)
+	decoder.UseNumber()
+	err := decoder.Decode(v)
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func mapStringToOrderedMap(s string, o *OrderedMap) error {
+	// parse string into map
+	m := map[string]interface{}{}
+
+	if o.useNumber {
+		err := unmarshalJSONUseNumber(s, &m)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := json.Unmarshal([]byte(s), &m)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Get the order of the keys
 	orderedKeys := []KeyIndex{}
 	for k, _ := range m {
@@ -194,6 +220,7 @@ func mapStringToOrderedMap(s string, o *OrderedMap) error {
 					// this may be recursive it values in the map are also maps
 					if hasValidJson {
 						newMap := New()
+						newMap.SetUseNumber(o.useNumber) // Preserve number setting
 						err := mapStringToOrderedMap(valueStr, newMap)
 						if err != nil {
 							return err
