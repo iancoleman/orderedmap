@@ -315,25 +315,24 @@ func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{})
 }
 
 func (o OrderedMap) MarshalJSON() ([]byte, error) {
-	s := "{"
-	for _, k := range o.keys {
-		// add key
-		kEscaped := strings.Replace(k, `"`, `\"`, -1)
-		s = s + `"` + kEscaped + `":`
-		// add value
-		v := o.values[k]
-		buffer := new(bytes.Buffer)
-		encoder := json.NewEncoder(buffer)
-		encoder.SetEscapeHTML(o.escapeHTML)
-		err := encoder.Encode(v)
-		if err != nil {
-			return []byte{}, err
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(o.escapeHTML)
+	for i, k := range o.keys {
+		if i > 0 {
+			buf.WriteByte(',')
 		}
-		s = s + buffer.String() + ","
+		// add key
+		if err := encoder.Encode(k); err != nil {
+			return nil, err
+		}
+		buf.WriteByte(':')
+		// add value
+		if err := encoder.Encode(o.values[k]); err != nil {
+			return nil, err
+		}
 	}
-	if len(o.keys) > 0 {
-		s = s[0 : len(s)-1]
-	}
-	s = s + "}"
-	return []byte(s), nil
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }

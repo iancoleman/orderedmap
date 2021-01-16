@@ -132,8 +132,8 @@ func TestMarshalJSON(t *testing.T) {
 	v.Set("e", 1)
 	v.Set("a", 2)
 	o.Set("orderedmap", v)
-	// double quote in key
-	o.Set(`test"ing`, 9)
+	// escape key
+	o.Set("test\n\r\t\\\"ing", 9)
 	// convert to json
 	b, err := json.Marshal(o)
 	if err != nil {
@@ -141,7 +141,7 @@ func TestMarshalJSON(t *testing.T) {
 	}
 	s := string(b)
 	// check json is correctly ordered
-	if s != `{"number":4,"string":"x","specialstring":"\\.\u003c\u003e[]{}_-","z":1,"a":2,"b":3,"slice":["1",1],"orderedmap":{"e":1,"a":2},"test\"ing":9}` {
+	if s != `{"number":4,"string":"x","specialstring":"\\.\u003c\u003e[]{}_-","z":1,"a":2,"b":3,"slice":["1",1],"orderedmap":{"e":1,"a":2},"test\n\r\t\\\"ing":9}` {
 		t.Error("JSON Marshal value is incorrect", s)
 	}
 	// convert to indented json
@@ -165,7 +165,7 @@ func TestMarshalJSON(t *testing.T) {
     "e": 1,
     "a": 2
   },
-  "test\"ing": 9
+  "test\n\r\t\\\"ing": 9
 }`
 	if si != ei {
 		fmt.Println(ei)
