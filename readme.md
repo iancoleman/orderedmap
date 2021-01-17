@@ -34,17 +34,17 @@ func main() {
     val, ok := o.Get("a")
 
     // use Keys instead of for k, v := range o
-    key := o.Keys()
+    keys := o.Keys()
     for _, k := range keys {
         v, _ := o.Get(k)
     }
 
     // use o.Delete instead of delete(o, key)
-    err := o.Delete("a")
+    o.Delete("a")
 
     // serialize to a json string using encoding/json
     bytes, err := json.Marshal(o)
-    prettyBytes, err := json.MarshalIndent(o)
+    prettyBytes, err := json.MarshalIndent(o, "", "  ")
 
     // deserialize a json string using encoding/json
     // all maps (including nested maps) will be parsed as orderedmaps
@@ -55,7 +55,7 @@ func main() {
     o.SortKeys(sort.Strings)
 
     // sort by Pair
-    o.Sort(func(a *Pair, b *Pair) bool {
+    o.Sort(func(a *orderedmap.Pair, b *orderedmap.Pair) bool {
         return a.Value().(float64) < b.Value().(float64)
     })
 }
