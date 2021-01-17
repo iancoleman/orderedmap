@@ -191,6 +191,24 @@ func TestMarshalJSONNoEscapeHTML(t *testing.T) {
 	}
 }
 
+func TestMarshalJSONNoEscapeHTMLRecursive(t *testing.T) {
+	src := `{"x":"<>","y":[{"z":["<>"]}]}`
+	o := New()
+	o.SetEscapeHTML(false)
+	err := json.Unmarshal([]byte(src), &o)
+	if err != nil {
+		t.Error("JSON Unmarshal error with special chars", err)
+	}
+	b, err := o.MarshalJSON()
+	if err != nil {
+		t.Error("Marshalling json", err)
+	}
+	s := strings.Replace(string(b), "\n", "", -1)
+	if s != src {
+		t.Error("JSON Marshal value is incorrect", s)
+	}
+}
+
 func TestUnmarshalJSON(t *testing.T) {
 	s := `{
   "number": 4,
@@ -309,12 +327,94 @@ func TestUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestUnmarshalJSONSpecialChars(t *testing.T) {
-	s := `{ " \\\\\\\\\\\\ "  : { "\\\\\\" : "\\\\\"\\" }, "\\":  " \\\\ test " }`
+func TestUnmarshalJSONDuplicateKeys(t *testing.T) {
+	s := `{
+		"a": [{}, []],
+		"b": {"x":[1]},
+		"c": "x",
+		"d": {"x":1},
+		"c": 1,
+		"d": {"y": 2},
+		"e": [{"x":1}],
+		"e": [{"z":2}],
+		"a": {},
+		"b": []
+	}`
 	o := New()
 	err := json.Unmarshal([]byte(s), &o)
 	if err != nil {
 		t.Error("JSON Unmarshal error with special chars", err)
+	}
+	expectedKeys := []string{
+		"c",
+		"d",
+		"e",
+		"a",
+		"b",
+	}
+	keys := o.Keys()
+	if len(keys) != len(expectedKeys) {
+		t.Error("Unmarshal key count", len(keys), "!=", len(expectedKeys))
+	}
+	for i, key := range keys {
+		if key != expectedKeys[i] {
+			t.Errorf("Unmarshal root key order: %d, %q != %q", i, key, expectedKeys[i])
+		}
+	}
+	vimap, _ := o.Get("a")
+	_ = vimap.(OrderedMap)
+	vislice, _ := o.Get("b")
+	_ = vislice.([]interface{})
+	vival, _ := o.Get("c")
+	_ = vival.(float64)
+
+	vimap, _ = o.Get("d")
+	m := vimap.(OrderedMap)
+	expectedKeys = []string{"y"}
+	keys = m.Keys()
+	if len(keys) != len(expectedKeys) {
+		t.Error("Unmarshal key count", len(keys), "!=", len(expectedKeys))
+	}
+	for i, key := range keys {
+		if key != expectedKeys[i] {
+			t.Errorf("Unmarshal key order: %d, %q != %q", i, key, expectedKeys[i])
+		}
+	}
+
+	vislice, _ = o.Get("e")
+	m = vislice.([]interface{})[0].(OrderedMap)
+	expectedKeys = []string{"z"}
+	keys = m.Keys()
+	if len(keys) != len(expectedKeys) {
+		t.Error("Unmarshal key count", len(keys), "!=", len(expectedKeys))
+	}
+	for i, key := range keys {
+		if key != expectedKeys[i] {
+			t.Errorf("Unmarshal key order: %d, %q != %q", i, key, expectedKeys[i])
+		}
+	}
+}
+
+func TestUnmarshalJSONSpecialChars(t *testing.T) {
+	s := `{ " \u0041\n\r\t\\\\\\\\\\\\ "  : { "\\\\\\" : "\\\\\"\\" }, "\\":  " \\\\ test ", "\n": "\r" }`
+	o := New()
+	err := json.Unmarshal([]byte(s), &o)
+	if err != nil {
+		t.Error("JSON Unmarshal error with special chars", err)
+	}
+	expectedKeys := []string{
+		" \u0041\n\r\t\\\\\\\\\\\\ ",
+		"\\",
+		"\n",
+	}
+	keys := o.Keys()
+	if len(keys) != len(expectedKeys) {
+		t.Error("Unmarshal key count", len(keys), "!=", len(expectedKeys))
+	}
+	for i, key := range keys {
+		if key != expectedKeys[i] {
+			t.Errorf("Unmarshal root key order: %d, %q != %q", i, key, expectedKeys[i])
+		}
 	}
 }
 
