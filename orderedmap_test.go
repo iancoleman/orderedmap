@@ -60,14 +60,14 @@ func TestOrderedMap(t *testing.T) {
 		"strings",
 		"mixed",
 	}
-	for i, _ := range keys {
-		if keys[i] != expectedKeys[i] {
-			t.Error("Keys method", keys[i], "!=", expectedKeys[i])
+	for i, key := range keys {
+		if key != expectedKeys[i] {
+			t.Error("Keys method", key, "!=", expectedKeys[i])
 		}
 	}
-	for i, _ := range expectedKeys {
-		if keys[i] != expectedKeys[i] {
-			t.Error("Keys method", keys[i], "!=", expectedKeys[i])
+	for i, key := range expectedKeys {
+		if key != expectedKeys[i] {
+			t.Error("Keys method", key, "!=", expectedKeys[i])
 		}
 	}
 	// delete
