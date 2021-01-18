@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"sort"
-	"strings"
 )
 
 type Pair struct {
