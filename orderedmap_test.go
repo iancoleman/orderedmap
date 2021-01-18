@@ -333,12 +333,14 @@ func TestUnmarshalJSONDuplicateKeys(t *testing.T) {
 		"b": {"x":[1]},
 		"c": "x",
 		"d": {"x":1},
+		"b": [{"x":[]}],
 		"c": 1,
 		"d": {"y": 2},
 		"e": [{"x":1}],
+		"e": [[]],
 		"e": [{"z":2}],
 		"a": {},
-		"b": []
+		"b": [[1]]
 	}`
 	o := New()
 	err := json.Unmarshal([]byte(s), &o)

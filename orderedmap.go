@@ -213,14 +213,19 @@ func decodeSlice(dec *json.Decoder, s []interface{}, escapeHTML bool) error {
 							return err
 						}
 						s[index] = newMap
+					} else if err = decodeOrderedMap(dec, &OrderedMap{}); err != nil {
+						return err
 					}
 				} else if err = decodeOrderedMap(dec, &OrderedMap{}); err != nil {
 					return err
 				}
 			case '[':
 				if index < len(s) {
-					values := s[index].([]interface{})
-					if err = decodeSlice(dec, values, escapeHTML); err != nil {
+					if values, ok := s[index].([]interface{}); ok {
+						if err = decodeSlice(dec, values, escapeHTML); err != nil {
+							return err
+						}
+					} else if err = decodeSlice(dec, []interface{}{}, escapeHTML); err != nil {
 						return err
 					}
 				} else if err = decodeSlice(dec, []interface{}{}, escapeHTML); err != nil {
