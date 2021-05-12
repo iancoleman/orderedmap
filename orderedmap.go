@@ -103,11 +103,14 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 	if o.values == nil {
 		o.values = map[string]interface{}{}
 	}
-	err := json.Unmarshal(b, &o.values)
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	err := d.Decode(&o.values)
 	if err != nil {
 		return err
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
 	if _, err = dec.Token(); err != nil { // skip '{'
 		return err
 	}
