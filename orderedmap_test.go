@@ -16,11 +16,19 @@ func TestOrderedMap(t *testing.T) {
 	if v.(int) != 3 {
 		t.Error("Set number")
 	}
+	k, _ := o.GetKey(3)
+	if k != "number" {
+		t.Error("Get number key")
+	}
 	// string
 	o.Set("string", "x")
 	v, _ = o.Get("string")
 	if v.(string) != "x" {
 		t.Error("Set string")
+	}
+	k, _ = o.GetKey("x")
+	if k != "string" {
+		t.Error("Get string key")
 	}
 	// string slice
 	o.Set("strings", []string{
@@ -52,6 +60,10 @@ func TestOrderedMap(t *testing.T) {
 	if v.(int) != 4 {
 		t.Error("Override existing key")
 	}
+	k, _ = o.GetKey(4)
+	if k != "number" {
+		t.Error("Get number key")
+	}
 	// Keys method
 	keys := o.Keys()
 	expectedKeys := []string{
@@ -79,6 +91,11 @@ func TestOrderedMap(t *testing.T) {
 	_, ok := o.Get("strings")
 	if ok {
 		t.Error("Delete did not remove 'strings' key")
+	}
+	o.Delete("number")
+	_, ok = o.GetKey(4)
+	if ok {
+		t.Error("Delete did not remove 'number' key")
 	}
 }
 
