@@ -537,13 +537,14 @@ func TestOrderedMap_uint64_slice_serialization(t *testing.T) {
 	uints := []uint64{math.MaxUint64, math.MaxUint64-100, math.MaxUint64-1000}
 
 	str1 := []byte(fmt.Sprintf(`{"key":[%d,%d,%d]}`, uints[0], uints[1], uints[2]))
-	om1 := New()
+	om := New()
+	om.SetUseNumber(true)
 
-	if err := json.Unmarshal(str1, om1); err != nil {
+	if err := json.Unmarshal(str1, om); err != nil {
 		t.Fatal(err)
 	}
 
-	str2, err := json.Marshal(om1)
+	str2, err := json.Marshal(om)
 	if err != nil {
 		t.Fatal(err)
 	}
