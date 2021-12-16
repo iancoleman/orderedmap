@@ -3,18 +3,18 @@ package orderedmap
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"sort"
 	"strings"
 )
-
-var NoValueError = errors.New("No value for this key")
 
 type KeyIndex struct {
 	Key   string
 	Index int
 }
+
 type ByIndex []KeyIndex
+
+var _ sort.Interface = &ByIndex{}
 
 func (a ByIndex) Len() int           { return len(a) }
 func (a ByIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -37,6 +37,8 @@ type ByPair struct {
 	Pairs    []*Pair
 	LessFunc func(a *Pair, j *Pair) bool
 }
+
+var _ sort.Interface = &ByPair{}
 
 func (a ByPair) Len() int           { return len(a.Pairs) }
 func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pairs[i] }
@@ -99,12 +101,12 @@ func (o *OrderedMap) Keys() []string {
 	return o.keys
 }
 
-// SortKeys Sort the map keys using your sort func
+// SortKeys sorts the map keys using your sort func
 func (o *OrderedMap) SortKeys(sortFunc func(keys []string)) {
 	sortFunc(o.keys)
 }
 
-// Sort Sort the map using your sort func
+// Sort sorts the map using your sort func
 func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 	pairs := make([]*Pair, len(o.keys))
 	for i, key := range o.keys {
@@ -118,28 +120,21 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 	}
 }
 
+var _ json.Unmarshaler = &OrderedMap{}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for OrderedMap.
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 	if o.values == nil {
 		o.values = map[string]interface{}{}
 	}
-	var err error
-	err = mapStringToOrderedMap(string(b), o)
-	if err != nil {
-		return err
-	}
-	return nil
+	return mapStringToOrderedMap(string(b), o)
 }
 
 func unmarshalJSONUseNumber(s string, v interface{}) error {
 	r := strings.NewReader(s)
 	decoder := json.NewDecoder(r)
 	decoder.UseNumber()
-	err := decoder.Decode(v)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return decoder.Decode(v)
 }
 
 func mapStringToOrderedMap(s string, o *OrderedMap) error {
@@ -341,6 +336,9 @@ func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{})
 	return nil
 }
 
+var _ json.Marshaler = &OrderedMap{}
+
+// MarshalJSON implements the json.Marshaler interface for OrderedMap.
 func (o OrderedMap) MarshalJSON() ([]byte, error) {
 	s := "{"
 	for _, k := range o.keys {
