@@ -1,8 +1,10 @@
 package orderedmap
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"testing"
@@ -528,5 +530,25 @@ func TestOrderedMap_empty_map(t *testing.T) {
 		t.Error("Empty map does not serialise to json correctly")
 		t.Error("Expect", srcStr)
 		t.Error("Got", marshalledStr)
+	}
+}
+
+func TestOrderedMap_uint64_slice_serialization(t *testing.T) {
+	uints := []uint64{math.MaxUint64, math.MaxUint64-100, math.MaxUint64-1000}
+
+	str1 := []byte(fmt.Sprintf(`{"key":[%d,%d,%d]}`, uints[0], uints[1], uints[2]))
+	om1 := New()
+
+	if err := json.Unmarshal(str1, om1); err != nil {
+		t.Fatal(err)
+	}
+
+	str2, err := json.Marshal(om1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(str1, str2) {
+		t.Fatalf("%s != %s", str1, str2)
 	}
 }
