@@ -48,7 +48,6 @@ type OrderedMap struct {
 	keys       []string
 	values     map[string]interface{}
 	escapeHTML bool
-	useNumber bool
 }
 
 func New() *OrderedMap {
@@ -61,10 +60,6 @@ func New() *OrderedMap {
 
 func (o *OrderedMap) SetEscapeHTML(on bool) {
 	o.escapeHTML = on
-}
-
-func (o *OrderedMap) SetUseNumber(on bool) {
-	o.useNumber = on
 }
 
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
@@ -130,9 +125,10 @@ func (o *OrderedMap) UnmarshalJSON(b []byte) error {
 	return mapStringToOrderedMap(string(b), o)
 }
 
-func unmarshalJSONUseNumber(s string, v interface{}) error {
+func unmarshalJSON(s string, v interface{}) error {
 	r := strings.NewReader(s)
 	decoder := json.NewDecoder(r)
+	// This option ensures that
 	decoder.UseNumber()
 	return decoder.Decode(v)
 }
@@ -140,17 +136,9 @@ func unmarshalJSONUseNumber(s string, v interface{}) error {
 func mapStringToOrderedMap(s string, o *OrderedMap) error {
 	// parse string into map
 	m := map[string]interface{}{}
-
-	if o.useNumber {
-		err := unmarshalJSONUseNumber(s, &m)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := json.Unmarshal([]byte(s), &m)
-		if err != nil {
-			return err
-		}
+	err := unmarshalJSON(s, &m)
+	if err != nil {
+		return err
 	}
 
 	// Get the order of the keys
@@ -215,7 +203,6 @@ func mapStringToOrderedMap(s string, o *OrderedMap) error {
 					// this may be recursive it values in the map are also maps
 					if hasValidJson {
 						newMap := New()
-						newMap.SetUseNumber(o.useNumber) // Preserve number setting
 						err := mapStringToOrderedMap(valueStr, newMap)
 						if err != nil {
 							return err
@@ -248,7 +235,7 @@ func mapStringToOrderedMap(s string, o *OrderedMap) error {
 					// this may be recursive if values in the slice are slices
 					if hasValidJson {
 						newSlice := []interface{}{}
-						err := sliceStringToSliceWithOrderedMaps(valueStr, &newSlice, o.useNumber)
+						err := sliceStringToSliceWithOrderedMaps(valueStr, &newSlice)
 						if err != nil {
 							return err
 						}
@@ -274,7 +261,7 @@ func mapStringToOrderedMap(s string, o *OrderedMap) error {
 	return nil
 }
 
-func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{}, useNumber bool) error {
+func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{}) error {
 	// if the value for this key is a []interface, convert any map items to an orderedmap.
 	// find end of valueStr by removing everything after last ]
 	// until it forms valid json
@@ -296,12 +283,7 @@ func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{},
 		// if this substring compiles to json, it's the next item
 		possibleItemStr := strings.TrimSpace(itemsStr[startItem:endItem])
 		var possibleItem interface{}
-		var err error
-		if useNumber {
-			err = unmarshalJSONUseNumber(possibleItemStr, &possibleItem)
-		} else {
-			err = json.Unmarshal([]byte(possibleItemStr), &possibleItem)
-		}
+		err := unmarshalJSON(possibleItemStr, &possibleItem)
 		if err != nil {
 			endItem = endItem + 1
 			continue
@@ -321,7 +303,7 @@ func sliceStringToSliceWithOrderedMaps(valueStr string, newSlice *[]interface{},
 		} else if possibleItemStr[0] == '[' {
 			// if item is slice, convert to slice with orderedmaps
 			newItem := []interface{}{}
-			err := sliceStringToSliceWithOrderedMaps(possibleItemStr, &newItem, useNumber)
+			err := sliceStringToSliceWithOrderedMaps(possibleItemStr, &newItem)
 			if err != nil {
 				return err
 			}
