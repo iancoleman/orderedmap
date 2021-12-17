@@ -1,8 +1,10 @@
 package orderedmap
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"testing"
@@ -395,39 +397,15 @@ func TestUnmarshalJSONStruct(t *testing.T) {
 	x, ok := v.Data.Get("x")
 	if !ok {
 		t.Errorf("missing expected key")
-	} else if x != float64(1) {
+	} else if x != json.Number("1") {
 		t.Errorf("unexpected value: %#v", x)
 	}
 }
 
-func TestRemarshalJSONWithoutUseNumber(t *testing.T) {
-	// 9007199254740993 is the smallest integer which cannot be represented exactly as a float64
-	const input = `{"data":{"x":9007199254740993}}`
-	const expected = `{"data":{"x":9007199254740992}}`
-
-	o := New()
-	o.SetUseNumber(false)
-
-	err := json.Unmarshal([]byte(input), &o)
-	if err != nil {
-		t.Fatalf("JSON unmarshal error: %v", err)
-	}
-
-	marshalled, err := json.Marshal(o)
-	if err != nil {
-		t.Errorf("Marshal failed: %v", err)
-	}
-
-	if string(marshalled) != expected {
-		t.Errorf("unexpected value: %s instead of %s", marshalled, expected)
-	}
-}
-
-func TestRemarshalJSONUseNumber(t *testing.T) {
+func TestRemarshalJSON(t *testing.T) {
 	const input = `{"data":{"x":9007199254740993}}`
 
 	o := New()
-	o.SetUseNumber(true)
 
 	err := json.Unmarshal([]byte(input), &o)
 	if err != nil {
@@ -482,7 +460,15 @@ func TestOrderedMap_Sort(t *testing.T) {
 	o := New()
 	json.Unmarshal([]byte(s), &o)
 	o.Sort(func(a *Pair, b *Pair) bool {
-		return a.value.(float64) > b.value.(float64)
+		na, err := a.value.(json.Number).Float64()
+		if err != nil {
+			panic(err)
+		}
+		nb, err := b.value.(json.Number).Float64()
+		if err != nil {
+			panic(err)
+		}
+		return na > nb
 	})
 
 	// Check the root keys
@@ -528,5 +514,25 @@ func TestOrderedMap_empty_map(t *testing.T) {
 		t.Error("Empty map does not serialise to json correctly")
 		t.Error("Expect", srcStr)
 		t.Error("Got", marshalledStr)
+	}
+}
+
+func TestOrderedMap_uint64_slice_serialization(t *testing.T) {
+	uints := []uint64{math.MaxUint64, math.MaxUint64-100, math.MaxUint64-1000}
+
+	str1 := []byte(fmt.Sprintf(`{"key":[%d,%d,%d]}`, uints[0], uints[1], uints[2]))
+	om := New()
+
+	if err := json.Unmarshal(str1, om); err != nil {
+		t.Fatal(err)
+	}
+
+	str2, err := json.Marshal(om)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(str1, str2) {
+		t.Fatalf("%s != %s", str1, str2)
 	}
 }
