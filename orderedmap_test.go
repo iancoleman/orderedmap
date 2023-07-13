@@ -69,10 +69,10 @@ func TestOrderedMap(t *testing.T) {
 	// Values method
 	values := o.Values()
 	expectedValues := map[string]interface{}{
-		"number": 4,
-		"string": "x",
+		"number":  4,
+		"string":  "x",
 		"strings": []string{"t", "u"},
-		"mixed": []interface{}{ 1, "1" },
+		"mixed":   []interface{}{1, "1"},
 	}
 	if !reflect.DeepEqual(values, expectedValues) {
 		t.Error("Values method returned unexpected map")
@@ -350,6 +350,7 @@ func TestUnmarshalJSONDuplicateKeys(t *testing.T) {
 		"b": [[1]]
 	}`
 	o := New()
+	o.SetJSONLastValueWins(true)
 	err := json.Unmarshal([]byte(s), &o)
 	if err != nil {
 		t.Error("JSON Unmarshal error with special chars", err)
@@ -401,6 +402,23 @@ func TestUnmarshalJSONDuplicateKeys(t *testing.T) {
 		if key != expectedKeys[i] {
 			t.Errorf("Unmarshal key order: %d, %q != %q", i, key, expectedKeys[i])
 		}
+	}
+}
+
+// TestOrderedMapUnmarshalJSONDuplicate tests that orderedMap errors on
+// duplicate JSON fields.
+func TestOrderedMapUnmarshalJSONDuplicate(t *testing.T) {
+	s := `{
+		"a": [{}, []],
+		"b": {"x":[1]},
+		"c": "x",
+		"d": {"x":1},
+		"b": [{"x":[]}]
+	}`
+	o := New()
+	err := json.Unmarshal([]byte(s), &o)
+	if err == nil {
+		t.Errorf("orderedMap unmarshal did not error on duplicate key")
 	}
 }
 
