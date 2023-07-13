@@ -66,11 +66,6 @@ func TestOrderedMap(t *testing.T) {
 			t.Error("Keys method", key, "!=", expectedKeys[i])
 		}
 	}
-	for i, key := range expectedKeys {
-		if key != expectedKeys[i] {
-			t.Error("Keys method", key, "!=", expectedKeys[i])
-		}
-	}
 	// Values method
 	values := o.Values()
 	expectedValues := map[string]interface{}{
