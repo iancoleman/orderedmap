@@ -3,6 +3,7 @@ package orderedmap
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -69,6 +70,17 @@ func TestOrderedMap(t *testing.T) {
 		if key != expectedKeys[i] {
 			t.Error("Keys method", key, "!=", expectedKeys[i])
 		}
+	}
+	// Values method
+	values := o.Values()
+	expectedValues := map[string]interface{}{
+		"number": 4,
+		"string": "x",
+		"strings": []string{"t", "u"},
+		"mixed": []interface{}{ 1, "1" },
+	}
+	if !reflect.DeepEqual(values, expectedValues) {
+		t.Error("Values method returned unexpected map")
 	}
 	// delete
 	o.Delete("strings")
