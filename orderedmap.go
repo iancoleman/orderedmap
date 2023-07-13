@@ -3,6 +3,7 @@ package orderedmap
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"sort"
 )
 
@@ -29,9 +30,10 @@ func (a ByPair) Swap(i, j int)      { a.Pairs[i], a.Pairs[j] = a.Pairs[j], a.Pai
 func (a ByPair) Less(i, j int) bool { return a.LessFunc(a.Pairs[i], a.Pairs[j]) }
 
 type OrderedMap struct {
-	keys       []string
-	values     map[string]interface{}
-	escapeHTML bool
+	keys              []string
+	values            map[string]interface{}
+	escapeHTML        bool
+	jsonLastValueWins bool // Permits duplicates on JSON unmarshal.  Otherwise errors on duplicates on unmarshal.
 }
 
 func New() *OrderedMap {
@@ -44,6 +46,10 @@ func New() *OrderedMap {
 
 func (o *OrderedMap) SetEscapeHTML(on bool) {
 	o.escapeHTML = on
+}
+
+func (o *OrderedMap) SetJSONLastValueWins(on bool) {
+	o.jsonLastValueWins = on
 }
 
 func (o *OrderedMap) Get(key string) (interface{}, bool) {
@@ -104,10 +110,17 @@ func (o *OrderedMap) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 }
 
 func (o *OrderedMap) UnmarshalJSON(b []byte) error {
+	var err error
+	if !o.jsonLastValueWins {
+		err = CheckDuplicate(json.NewDecoder(bytes.NewReader(b)))
+		if err != nil {
+			return err
+		}
+	}
 	if o.values == nil {
 		o.values = map[string]interface{}{}
 	}
-	err := json.Unmarshal(b, &o.values)
+	err = json.Unmarshal(b, &o.values)
 	if err != nil {
 		return err
 	}
@@ -263,4 +276,85 @@ func (o OrderedMap) MarshalJSON() ([]byte, error) {
 	}
 	buf.WriteByte('}')
 	return buf.Bytes(), nil
+}
+
+// ErrJSONDuplicate allows applications to check for JSON duplicate error.
+type ErrJSONDuplicate error
+
+// CheckDuplicate checks for JSON duplicates on ingest (unmarshal).  Note that
+// Go maps and structs and Javascript objects (ES6) already require unique
+// JSON names.
+//
+// Duplicate JSON fields are a security issue that wasn't addressed by the
+// original spec that results in surprising behavior and is a source of bugs.
+// See the article, "[An Exploration of JSON Interoperability
+// Vulnerabilities](https://bishopfox.com/blog/json-interoperability-vulnerabilities)"
+// and control-f "duplicate".
+//
+// Until Go releases the planned revision to the JSON package (See
+// https://github.com/go-json-experiment/json), or adds support for erroring on
+// duplicates to the current package, this function is needed.
+//
+// After JSON was widely adopted, Douglas Crockford (JSON's inventor), tried to
+// fix this by updating JSON to define "must error on duplicates" as the correct
+// behavior,  but it was decided it was too late
+// (https://esdiscuss.org/topic/json-duplicate-keys).
+//
+// Although Douglas Crockford couldn't change the JSON spec to force
+// implementations to error on duplicate, his Java JSON implementation errors on
+// duplicates. Others implementations behaviors are `last-value-wins`, support
+// duplicate keys, or other non-standard behavior. The [JSON
+// RFC](https://datatracker.ietf.org/doc/html/rfc8259#section-4) states that
+// implementations should not allow duplicate keys.  It then notes the varying behavior
+// of existing implementations.
+//
+// Disallowing duplicates conforms to the small I-JSON RFC. The author of
+// I-JSON, Tim Bray, is also the author of current JSON specification (RFC
+// 8259).  See also https://github.com/json5/json5-spec/issues/38.
+func CheckDuplicate(d *json.Decoder) error {
+	t, err := d.Token()
+	if err != nil {
+		return err
+	}
+
+	delim, ok := t.(json.Delim) // Is it a delimiter?
+	if !ok {
+		return nil // scaler type, nothing to do
+	}
+
+	switch delim {
+	case '{':
+		keys := make(map[string]bool)
+		for d.More() {
+			t, err := d.Token() // Get field key.
+			if err != nil {
+				return err
+			}
+
+			key := t.(string)
+			if keys[key] { // Check for duplicates.
+				return ErrJSONDuplicate(fmt.Errorf("Coze: JSON duplicate field %q", key))
+			}
+			keys[key] = true
+			err = CheckDuplicate(d) // Recursive, Check value in case value is object.
+			if err != nil {
+				return err
+			}
+		}
+		if _, err := d.Token(); err != nil { // consume trailing }
+			return err
+		}
+
+	case '[':
+		for d.More() {
+			if err := CheckDuplicate(d); err != nil {
+				return err
+			}
+		}
+		// consume trailing ]
+		if _, err := d.Token(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
