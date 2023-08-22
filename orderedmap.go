@@ -76,6 +76,15 @@ func (o *OrderedMap) Delete(key string) {
 	delete(o.values, key)
 }
 
+func (o *OrderedMap) Range(f func(key string, value interface{}) bool) {
+	for _, k := range o.keys {
+		v := o.values[k]
+		if !f(k, v) {
+			break
+		}
+	}
+}
+
 func (o *OrderedMap) Keys() []string {
 	return o.keys
 }

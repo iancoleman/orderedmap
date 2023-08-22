@@ -69,10 +69,10 @@ func TestOrderedMap(t *testing.T) {
 	// Values method
 	values := o.Values()
 	expectedValues := map[string]interface{}{
-		"number": 4,
-		"string": "x",
+		"number":  4,
+		"string":  "x",
 		"strings": []string{"t", "u"},
-		"mixed": []interface{}{ 1, "1" },
+		"mixed":   []interface{}{1, "1"},
 	}
 	if !reflect.DeepEqual(values, expectedValues) {
 		t.Error("Values method returned unexpected map")
@@ -593,5 +593,70 @@ func TestOrderedMap_empty_map(t *testing.T) {
 		t.Error("Empty map does not serialise to json correctly")
 		t.Error("Expect", srcStr)
 		t.Error("Got", marshalledStr)
+	}
+}
+
+func TestOrderedMap_Range(t *testing.T) {
+	tests := map[string]struct {
+		in []struct {
+			k string
+			v int
+		}
+		out       []int
+		rangeFunc func(k string, v interface{}) bool
+	}{
+		"test full range": {
+			in: []struct {
+				k string
+				v int
+			}{
+				{k: "hello", v: 1},
+				{k: "there", v: 2},
+				{k: "outlier", v: 567},
+				{k: "wow", v: 4},
+			},
+			out: []int{1, 2, 567, 4},
+		},
+		"test range with break": {
+			in: []struct {
+				k string
+				v int
+			}{
+				{k: "hello", v: 1},
+				{k: "there", v: 2},
+				{k: "outlier", v: 567},
+				{k: "wow", v: 4},
+			},
+			out: []int{1, 2, 567},
+			rangeFunc: func(k string, v interface{}) bool {
+				return k != "outlier"
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := New()
+
+			for _, p := range test.in {
+				o.Set(p.k, p.v)
+			}
+
+			var out []int
+			o.Range(func(k string, v interface{}) bool {
+				i, ok := v.(int)
+				if !ok {
+					t.Errorf("%q is not an int. got=%v", k, v)
+				}
+
+				out = append(out, i)
+
+				if test.rangeFunc != nil {
+					return test.rangeFunc(k, v)
+				}
+
+				return true
+			})
+		})
 	}
 }
