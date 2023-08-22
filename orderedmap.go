@@ -76,6 +76,9 @@ func (o *OrderedMap) Delete(key string) {
 	delete(o.values, key)
 }
 
+// Range over the ordered map, accessing entries in the same order they were
+// added, making the traversal deterministic.
+// This API is based on the api `sync.Map.Range`.
 func (o *OrderedMap) Range(f func(key string, value interface{}) bool) {
 	for _, k := range o.keys {
 		v := o.values[k]
