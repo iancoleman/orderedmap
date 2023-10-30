@@ -1,6 +1,7 @@
 package orderedmap
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -493,7 +494,7 @@ func TestUnmarshalJSONArrayOfMaps(t *testing.T) {
 
 func TestUnmarshalJSONStruct(t *testing.T) {
 	var v struct {
-		Data OrderedMapImpl `json:"data"`
+		Data orderedMapFrontend `json:"data"`
 	}
 
 	err := json.Unmarshal([]byte(`{ "data": { "x": 1 } }`), &v)
@@ -641,91 +642,35 @@ func TestMutableAfterUnmarshal(t *testing.T) {
 }
 
 type myType struct {
-	omap OrderedMap
+	OrderedMapCore
 }
 
-func NewMyType() OrderedMap {
+func newMyType() *myType {
 	return &myType{
-		omap: New(),
+		OrderedMapCore: NewCore(),
 	}
 }
 
-func (j *myType) Clone(v ...map[string]interface{}) OrderedMap {
-	return &myType{
-		omap: j.omap.Clone(v...),
-	}
+func (o *myType) UnmarshalJSON(b []byte) error {
+	return BoundUnmarshalJSON(o.OrderedMapCore, func(oms ...map[string]interface{}) OrderedMapCore {
+		clone := newMyType()
+		return clone
+	}, b)
 }
 
-func (j *myType) Delete(key string) {
-	j.omap.Delete(key)
+func (o myType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	err := BoundMarshalJSON(o.OrderedMapCore, encoder, &buf)
+	return buf.Bytes(), err
 }
 
-func (j *myType) SortKeys(fn func([]string)) {
-	j.omap.SortKeys(fn)
-}
-func (j *myType) Sort(fn func(*Pair, *Pair) bool) {
-	j.omap.Sort(fn)
+func (o myType) Get(k string) (interface{}, bool) {
+	return o.OrderedMapCore.CoreGetKey(k)
 }
 
-func (j *myType) SetKeys(keys []string) {
-	j.omap.SetKeys(keys)
-}
-
-func (j *myType) SetEscapeHTML(bool) {
-	j.omap.SetEscapeHTML(true)
-}
-
-func (j *myType) InitValues() {
-	j.omap.InitValues()
-}
-
-// Len implements JSONProperty.
-func (j *myType) Len() int {
-	return len(j.omap.Keys())
-}
-
-// Get implements JSONProperty.
-func (j *myType) Get(key string) (interface{}, bool) {
-	return j.Lookup(key)
-}
-
-// Lookup implements JSONProperty.
-func (j *myType) Lookup(key string) (interface{}, bool) {
-	out, found := j.omap.Get(key)
-	if !found {
-		return nil, false
-	}
-	isOmap, found := out.(OrderedMap)
-	if found {
-		return &myType{
-			omap: isOmap,
-		}, true
-	}
-	return out, true
-
-}
-
-// MarshalJSON implements JSONProperty.
-func (j *myType) MarshalJSON() ([]byte, error) {
-	return j.omap.MarshalJSON()
-}
-
-// Set implements JSONProperty.
-func (j *myType) Set(key string, value interface{}) {
-	j.omap.Set(key, value)
-}
-
-// UnmarshalJSON implements JSONProperty.
-func (j *myType) UnmarshalJSON(b []byte) error {
-	return BoundUnmarshalJSON(j, b)
-}
-
-func (j *myType) Keys() []string {
-	return j.omap.Keys()
-}
-
-func (j *myType) Values() map[string]interface{} {
-	return j.omap.Values()
+func (o *myType) Keys() []string {
+	return o.OrderedMapCore.CoreKeys()
 }
 
 func TestClone(t *testing.T) {
@@ -740,7 +685,7 @@ func TestClone(t *testing.T) {
                         "x": 1
                 }
         }`
-	out := NewMyType()
+	out := newMyType()
 	err := json.Unmarshal([]byte(input), &out)
 	if err != nil {
 		t.Fatal(err)
