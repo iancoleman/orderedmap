@@ -40,19 +40,36 @@ type OrderedMap interface {
 	Set(key string, value interface{})
 	Delete(key string)
 	Keys() []string
+	SetKeys(keys []string)
 	Values() map[string]interface{}
+	InitValues()
 	SortKeys(sortFunc func(keys []string))
 	Sort(lessFunc func(a *Pair, b *Pair) bool)
 	UnmarshalJSON(b []byte) error
 	MarshalJSON() ([]byte, error)
+	Clone(v ...map[string]interface{}) OrderedMap
 }
 
 func New() OrderedMap {
-	o := OrderedMapImpl{}
-	o.keys = []string{}
-	o.values = map[string]interface{}{}
-	o.escapeHTML = true
-	return &o
+	return &OrderedMapImpl{
+		keys:       make([]string, 0, 1),
+		values:     make(map[string]interface{}, 1),
+		escapeHTML: true,
+	}
+}
+
+func (o *OrderedMapImpl) Clone(oms ...map[string]interface{}) OrderedMap {
+	var om map[string]interface{}
+	if len(oms) > 0 {
+		om = oms[0]
+	} else {
+		om = make(map[string]interface{})
+	}
+	return &OrderedMapImpl{
+		keys:       make([]string, 0, len(om)),
+		values:     om,
+		escapeHTML: o.escapeHTML,
+	}
 }
 
 func (o *OrderedMapImpl) SetEscapeHTML(on bool) {
@@ -93,8 +110,18 @@ func (o *OrderedMapImpl) Keys() []string {
 	return o.keys
 }
 
+func (o *OrderedMapImpl) SetKeys(keys []string) {
+	o.keys = keys
+}
+
 func (o *OrderedMapImpl) Values() map[string]interface{} {
 	return o.values
+}
+
+func (o *OrderedMapImpl) InitValues() {
+	if o.values == nil {
+		o.values = make(map[string]interface{})
+	}
 }
 
 // SortKeys Sort the map keys using your sort func
@@ -116,11 +143,10 @@ func (o *OrderedMapImpl) Sort(lessFunc func(a *Pair, b *Pair) bool) {
 	}
 }
 
-func (o *OrderedMapImpl) UnmarshalJSON(b []byte) error {
-	if o.values == nil {
-		o.values = map[string]interface{}{}
-	}
-	err := json.Unmarshal(b, &o.values)
+func BoundUnmarshalJSON(o OrderedMap, b []byte) error {
+	o.InitValues()
+	val := o.Values()
+	err := json.Unmarshal(b, &val)
 	if err != nil {
 		return err
 	}
@@ -128,12 +154,16 @@ func (o *OrderedMapImpl) UnmarshalJSON(b []byte) error {
 	if _, err = dec.Token(); err != nil { // skip '{'
 		return err
 	}
-	o.keys = make([]string, 0, len(o.values))
+	// o.SetKeys(make([]string, 0, len(o.Values())))
 	return decodeOrderedMap(dec, o)
 }
 
-func decodeOrderedMap(dec *json.Decoder, o *OrderedMapImpl) error {
-	hasKey := make(map[string]bool, len(o.values))
+func (o *OrderedMapImpl) UnmarshalJSON(b []byte) error {
+	return BoundUnmarshalJSON(o, b)
+}
+
+func decodeOrderedMap(dec *json.Decoder, o OrderedMap) error {
+	hasKey := make(map[string]bool, len(o.Values()))
 	for {
 		token, err := dec.Token()
 		if err != nil {
@@ -145,16 +175,16 @@ func decodeOrderedMap(dec *json.Decoder, o *OrderedMapImpl) error {
 		key := token.(string)
 		if hasKey[key] {
 			// duplicate key
-			for j, k := range o.keys {
+			for j, k := range o.Keys() {
 				if k == key {
-					copy(o.keys[j:], o.keys[j+1:])
+					copy(o.Keys()[j:], o.Keys()[j+1:])
 					break
 				}
 			}
-			o.keys[len(o.keys)-1] = key
+			o.Keys()[len(o.Keys())-1] = key
 		} else {
 			hasKey[key] = true
-			o.keys = append(o.keys, key)
+			o.SetKeys(append(o.Keys(), key))
 		}
 
 		token, err = dec.Token()
@@ -164,35 +194,27 @@ func decodeOrderedMap(dec *json.Decoder, o *OrderedMapImpl) error {
 		if delim, ok := token.(json.Delim); ok {
 			switch delim {
 			case '{':
-				if values, ok := o.values[key].(map[string]interface{}); ok {
-					newMap := &OrderedMapImpl{
-						keys:       make([]string, 0, len(values)),
-						values:     values,
-						escapeHTML: o.escapeHTML,
-					}
+				if values, ok := o.Values()[key].(map[string]interface{}); ok {
+					newMap := o.Clone(values)
 					if err = decodeOrderedMap(dec, newMap); err != nil {
 						return err
 					}
-					o.values[key] = newMap
-				} else if oldMap, ok := o.values[key].(*OrderedMapImpl); ok {
-					newMap := &OrderedMapImpl{
-						keys:       make([]string, 0, len(oldMap.values)),
-						values:     oldMap.values,
-						escapeHTML: o.escapeHTML,
-					}
+					o.Values()[key] = newMap
+				} else if oldMap, ok := o.Values()[key].(OrderedMap); ok {
+					newMap := o.Clone(oldMap.Values())
 					if err = decodeOrderedMap(dec, newMap); err != nil {
 						return err
 					}
-					o.values[key] = newMap
-				} else if err = decodeOrderedMap(dec, &OrderedMapImpl{}); err != nil {
+					o.Values()[key] = newMap
+				} else if err = decodeOrderedMap(dec, o.Clone()); err != nil {
 					return err
 				}
 			case '[':
-				if values, ok := o.values[key].([]interface{}); ok {
-					if err = decodeSlice(dec, values, o.escapeHTML); err != nil {
+				if values, ok := o.Values()[key].([]interface{}); ok {
+					if err = decodeSlice(dec, values, o); err != nil {
 						return err
 					}
-				} else if err = decodeSlice(dec, []interface{}{}, o.escapeHTML); err != nil {
+				} else if err = decodeSlice(dec, []interface{}{}, o); err != nil {
 					return err
 				}
 			}
@@ -200,7 +222,7 @@ func decodeOrderedMap(dec *json.Decoder, o *OrderedMapImpl) error {
 	}
 }
 
-func decodeSlice(dec *json.Decoder, s []interface{}, escapeHTML bool) error {
+func decodeSlice(dec *json.Decoder, s []interface{}, o OrderedMap) error {
 	for index := 0; ; index++ {
 		token, err := dec.Token()
 		if err != nil {
@@ -211,41 +233,33 @@ func decodeSlice(dec *json.Decoder, s []interface{}, escapeHTML bool) error {
 			case '{':
 				if index < len(s) {
 					if values, ok := s[index].(map[string]interface{}); ok {
-						newMap := &OrderedMapImpl{
-							keys:       make([]string, 0, len(values)),
-							values:     values,
-							escapeHTML: escapeHTML,
-						}
+						newMap := o.Clone(values)
 						if err = decodeOrderedMap(dec, newMap); err != nil {
 							return err
 						}
 						s[index] = newMap
-					} else if oldMap, ok := s[index].(*OrderedMapImpl); ok {
-						newMap := &OrderedMapImpl{
-							keys:       make([]string, 0, len(oldMap.values)),
-							values:     oldMap.values,
-							escapeHTML: escapeHTML,
-						}
+					} else if oldMap, ok := s[index].(OrderedMap); ok {
+						newMap := o.Clone(oldMap.Values())
 						if err = decodeOrderedMap(dec, newMap); err != nil {
 							return err
 						}
 						s[index] = newMap
-					} else if err = decodeOrderedMap(dec, &OrderedMapImpl{}); err != nil {
+					} else if err = decodeOrderedMap(dec, o.Clone()); err != nil {
 						return err
 					}
-				} else if err = decodeOrderedMap(dec, &OrderedMapImpl{}); err != nil {
+				} else if err = decodeOrderedMap(dec, o.Clone()); err != nil {
 					return err
 				}
 			case '[':
 				if index < len(s) {
 					if values, ok := s[index].([]interface{}); ok {
-						if err = decodeSlice(dec, values, escapeHTML); err != nil {
+						if err = decodeSlice(dec, values, o); err != nil {
 							return err
 						}
-					} else if err = decodeSlice(dec, []interface{}{}, escapeHTML); err != nil {
+					} else if err = decodeSlice(dec, []interface{}{}, o); err != nil {
 						return err
 					}
-				} else if err = decodeSlice(dec, []interface{}{}, escapeHTML); err != nil {
+				} else if err = decodeSlice(dec, []interface{}{}, o); err != nil {
 					return err
 				}
 			case ']':

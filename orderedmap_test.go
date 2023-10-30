@@ -639,3 +639,155 @@ func TestMutableAfterUnmarshal(t *testing.T) {
 		t.Fatal("expect blabla")
 	}
 }
+
+type myType struct {
+	omap OrderedMap
+}
+
+func NewMyType() OrderedMap {
+	return &myType{
+		omap: New(),
+	}
+}
+
+func (j *myType) Clone(v ...map[string]interface{}) OrderedMap {
+	return &myType{
+		omap: j.omap.Clone(v...),
+	}
+}
+
+func (j *myType) Delete(key string) {
+	j.omap.Delete(key)
+}
+
+func (j *myType) SortKeys(fn func([]string)) {
+	j.omap.SortKeys(fn)
+}
+func (j *myType) Sort(fn func(*Pair, *Pair) bool) {
+	j.omap.Sort(fn)
+}
+
+func (j *myType) SetKeys(keys []string) {
+	j.omap.SetKeys(keys)
+}
+
+func (j *myType) SetEscapeHTML(bool) {
+	j.omap.SetEscapeHTML(true)
+}
+
+func (j *myType) InitValues() {
+	j.omap.InitValues()
+}
+
+// Len implements JSONProperty.
+func (j *myType) Len() int {
+	return len(j.omap.Keys())
+}
+
+// Get implements JSONProperty.
+func (j *myType) Get(key string) (interface{}, bool) {
+	return j.Lookup(key)
+}
+
+// Lookup implements JSONProperty.
+func (j *myType) Lookup(key string) (interface{}, bool) {
+	out, found := j.omap.Get(key)
+	if !found {
+		return nil, false
+	}
+	isOmap, found := out.(OrderedMap)
+	if found {
+		return &myType{
+			omap: isOmap,
+		}, true
+	}
+	return out, true
+
+}
+
+// MarshalJSON implements JSONProperty.
+func (j *myType) MarshalJSON() ([]byte, error) {
+	return j.omap.MarshalJSON()
+}
+
+// Set implements JSONProperty.
+func (j *myType) Set(key string, value interface{}) {
+	j.omap.Set(key, value)
+}
+
+// UnmarshalJSON implements JSONProperty.
+func (j *myType) UnmarshalJSON(b []byte) error {
+	return BoundUnmarshalJSON(j, b)
+}
+
+func (j *myType) Keys() []string {
+	return j.omap.Keys()
+}
+
+func (j *myType) Values() map[string]interface{} {
+	return j.omap.Values()
+}
+
+func TestClone(t *testing.T) {
+	const input = `{
+                "foo": [
+                        { "x": 1 },
+                        { "y": 2 },
+                        "string",
+                        4711
+                ],
+                "bar": {
+                        "x": 1
+                }
+        }`
+	out := NewMyType()
+	err := json.Unmarshal([]byte(input), &out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	oarray, found := out.Get("foo")
+	if !found {
+		t.Fatal("foo is not found")
+	}
+	array, found := oarray.([]interface{})
+	if !found {
+		t.Fatal("foo is not an array")
+	}
+
+	if len(array) != 4 {
+		t.Fatal("array has not 4 elements")
+	}
+	_, found = array[0].(*myType)
+	if !found {
+		t.Fatal("array[0] is not a myType")
+	}
+	_, found = array[1].(*myType)
+	if !found {
+		t.Fatal("array[1] is not a myType")
+	}
+	if array[2].(string) != "string" {
+		t.Fatal("array[2] is not a string")
+	}
+	if array[3].(float64) != 4711 {
+		t.Fatal("array[3] is not a float64")
+	}
+	if array[0].(*myType).Keys()[0] != "x" {
+		t.Fatal("array[0].x is not 1")
+	}
+	if array[1].(*myType).Keys()[0] != "y" {
+		t.Fatal("array[1].y is not 2")
+	}
+
+	obar, found := out.Get("bar")
+	if !found {
+		t.Fatal("bar is not found")
+	}
+	bar, found := obar.(*myType)
+	if !found {
+		t.Fatal("bar is not a myType")
+	}
+	if bar.Keys()[0] != "x" {
+		t.Fatal("bar.x is not 1")
+	}
+}
